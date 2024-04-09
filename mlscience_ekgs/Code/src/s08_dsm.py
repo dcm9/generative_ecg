@@ -15,7 +15,7 @@ SIGMAS = utils.get_sigmas()
 
 # Annealed Langevin sampling
 def sample_annealed_langevin(apply_fn, x_initial, params, key, 
-                             eps=2e-5, num_steps=100):
+                             eps=1e-5, num_steps=100):
     if isinstance(key, int):
         key = jr.PRNGKey(key)
     x_t, x_sequence = x_initial, [x_initial]

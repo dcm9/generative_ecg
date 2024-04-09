@@ -154,25 +154,25 @@ def dr_reg(input, x_pred, pred_fn):
 
 
 def binary_loss(key, params, split_idx, input, encoder_apply, decoder_apply,
-                pred_fn, alpha, beta):
+                pred_fn, beta1, beta2):
     """Binary cross-entropy loss."""
     loss_rec, loss_kl, x_pred = losses(
         key, params, split_idx, input, encoder_apply, decoder_apply
     )
     dr_reg_val = dr_reg(input, x_pred, pred_fn)
-    result = loss_rec + alpha * loss_kl + beta * dr_reg_val
+    result = loss_rec + beta1 * loss_kl + beta2 * dr_reg_val
 
-    return result, (loss_rec, loss_kl, beta * dr_reg_val)
+    return result, (loss_rec, loss_kl, beta2 * dr_reg_val)
 
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
 def train_step(i, state, batch, encoder_apply, decoder_apply, split_idx,
-               pred_fn, alpha_scheduler, beta):
+               pred_fn, beta1_scheduler, beta2):
     key = jr.PRNGKey(i)
-    alpha = 1 - alpha_scheduler(i)
+    beta1 = 1 - beta1_scheduler(i)
     binary_loss_fn = lambda params, key, input: binary_loss(
         key, params, split_idx, input, encoder_apply, decoder_apply,
-        pred_fn, alpha, beta
+        pred_fn, beta1, beta2
     )
     keys = jr.split(key, len(batch))
     loss_fn = lambda params: tree_map(
@@ -186,11 +186,13 @@ def train_step(i, state, batch, encoder_apply, decoder_apply, split_idx,
     return state, loss, (loss_rec, loss_kl, dr_reg_val)
 
 
-def train_dr_vae(pred_fn, X_train, alpha, beta, z_dim,
+def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
                  key=0, n_epochs=100, batch_size=128, hidden_width=50,
                  hidden_depth=2, lr_init=1e-5, lr_peak=1e-4, lr_end=1e-6,
                  encoder_type="mlp", use_bias=True,
-                 verbose=True, decay_steps=1_000):
+                 beta1_scheduler_type="warmup_cosine"):
+    assert beta1_scheduler_type in ["constant", "linear", "cosine",
+                                    "warmup_cosine", "cyclical"]
     if isinstance(key, int):
         key = jr.PRNGKey(key)
 
@@ -230,11 +232,12 @@ def train_dr_vae(pred_fn, X_train, alpha, beta, z_dim,
     split_idx = len(params_enc)
 
     # Train state
+    n_steps = n_epochs * (n // batch_size)
     lr_schedule = optax.warmup_cosine_decay_schedule(
         init_value=lr_init,
         peak_value=lr_peak,
         warmup_steps=100,
-        decay_steps=n//batch_size * n_epochs,
+        decay_steps=n_steps - 100,
         end_value=lr_end
     )
     optimizer = optax.adam(lr_schedule)
@@ -244,10 +247,30 @@ def train_dr_vae(pred_fn, X_train, alpha, beta, z_dim,
 
     pbar = tqdm(range(n_epochs), desc=f"Epoch 0 average loss: 0.0")
     losses, losses_rec, losses_kl, losses_dr = [], [], [], []
-    ctr, n_steps = 0, n_epochs * (n // batch_size)
-    alpha_scheduler = optax.warmup_cosine_decay_schedule(
-        1.0, 0.99, n_steps // 4, n_steps // 2, 1.0 - alpha
-    )
+    ctr = 0
+    if beta1_scheduler_type == "constant":
+        beta1_scheduler = lambda x: 1.0 - beta1
+    elif beta1_scheduler_type == "linear":
+        beta1_scheduler = optax.linear_schedule(
+            init_value=1.0, end_value=1.0-beta1, transition_steps=n_steps // 2
+        )
+    elif beta1_scheduler_type == "cosine":
+        beta1_scheduler = optax.cosine_decay_schedule(
+            1.0, n_steps // 2, alpha=1.0-beta1
+        )
+    elif beta1_scheduler_type == "warmup_cosine":
+        beta1_scheduler = optax.join_schedules(
+            [optax.linear_schedule(1.0, 1.0-beta1, n_steps // 4),
+             optax.cosine_decay_schedule(1.0, n_steps // 2, alpha=1.0-beta1)],
+            [n_steps // 4]
+        )
+    elif beta1_scheduler_type == "cyclical":
+        beta1_scheduler = optax.join_schedules(
+            [optax.linear_schedule(1.0, 1.0-beta1, n_steps // 8)] * 4,
+            [x * n_steps // 4 for x in range(1, 4)]
+        )
+    else:
+        raise ValueError(f"Unknown beta1 scheduler type: {beta1_scheduler_type}")
     for epoch in pbar:
         key = jr.PRNGKey(epoch)
         idx = jr.permutation(key, n)
@@ -262,7 +285,7 @@ def train_dr_vae(pred_fn, X_train, alpha, beta, z_dim,
             X_batch = X_train[lb:ub]
             state, loss, (loss_rec, loss_kl, dr_reg_val) = train_step(
                 ctr, state, X_batch, apply_fn_enc, apply_fn_dec,
-                split_idx, pred_fn, alpha_scheduler, beta
+                split_idx, pred_fn, beta1_scheduler, beta2
             )
             losses_epoch.append(loss)
             losses_rec.append(loss_rec)

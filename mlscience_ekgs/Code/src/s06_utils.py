@@ -13,7 +13,8 @@ def get_sigmas(sigma_min=0.01, sigma_max=1.0, num_scales=10):
     return sigmas
 
 
-def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None):
+def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None,
+             title=None, ylim=None, **args):
     fig, ax = plt.subplots(figsize=figsize)
     ax.set_xticks([])
     ax.set_yticks([])
@@ -35,9 +36,15 @@ def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None):
                 range(len(data)), data - 2*std[i], data + 2*std[i], 
                 color='orange', alpha=0.5
             )
+        if ylim:
+            ax.set_ylim(ylim)
         
         ax.set_ylabel(f"{channels[i]} (mV)")
-        ax.set_yticks([])
-        ax.set_xlabel("Sample");
+    
+    if title is not None:
+        if args:
+            for k, v in args.items():
+                title += f" | {k}: {v(channel_data):.2f}"
+        fig.suptitle(title, fontsize=16)
         
     return fig, axes

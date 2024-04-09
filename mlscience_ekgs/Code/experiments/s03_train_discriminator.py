@@ -12,7 +12,7 @@ import orbax.checkpoint as orbax_ckpt
 import tqdm
 
 from mlscience_ekgs.Code.experiments.s02_train_and_generate_ecgs import load_dataset
-from mlscience_ekgs.settings import result_path
+from mlscience_ekgs.settings import disc_path
 
 
 class CNN(nn.Module):
@@ -64,7 +64,7 @@ def update_step(state, apply_fn, X_batch, y_batch, problem="classification"):
     )
     state = state.apply_gradients(grads=grads)
 
-    return state, loss 
+    return state, loss, aux
 
 
 def train_epoch(X, y, state, apply_fn, batch_size=128, key=0, 
@@ -78,19 +78,21 @@ def train_epoch(X, y, state, apply_fn, batch_size=128, key=0,
     rem = n_train % batch_size
     if rem:
         n_batches += 1
-    losses = []
+    losses, auxes = [], []
     for batch in range(n_batches):
         lb, ub = batch*batch_size, (batch+1)*batch_size
         X_batch, y_batch = X[lb:ub], y[lb:ub]
-        state, loss = update_step(state, apply_fn, X_batch, y_batch,
+        state, loss, aux = update_step(state, apply_fn, X_batch, y_batch,
                                   problem=problem)
         losses.append(loss)
+        auxes.append(aux)
     loss = jnp.array(losses).mean()
+    aux = jnp.array(auxes).mean()
 
-    return state, loss
+    return state, loss, aux
 
 
-def train(X, y, lr_init=1e-3, lr_peak=5e-2, lr_end=1e-3, n_epochs=10, 
+def train(X, y, lr_init=1e-3, lr_peak=1e-2, lr_end=1e-3, n_epochs=10, 
           batch_size=64, key=0, problem="classification"):
     if isinstance(key, int):
         key = jr.PRNGKey(key)
@@ -116,28 +118,42 @@ def train(X, y, lr_init=1e-3, lr_peak=5e-2, lr_end=1e-3, n_epochs=10,
     state = train_state.TrainState.create(
         apply_fn=None, params=params, tx=optimizer
     )
-   
-    prange = tqdm.tqdm(range(n_epochs),
-                       desc=f"Epoch {0: >6} | Loss: {0.:>10.9f}")
+    if problem == "classification":
+        prange = tqdm.tqdm(
+            range(n_epochs), desc=f"Epoch {0:>6} | "
+            f"Loss: {0.:>10.5f} | Accuracy: {0.:>10.2f}%"
+        )
+    else:
+        prange = tqdm.tqdm(
+            range(n_epochs), desc=f"Epoch {0:>6} | RMSE: {0.:>10.5f}"
+        )
     for epoch in prange:
-        state, loss = train_epoch(
+        state, loss, aux = train_epoch(
             X, y, state, apply_fn, batch_size, epoch, problem
         )
-        prange.set_description(
-            f"Epoch {epoch+1: >6} | Loss: {loss:>10.9f}"
-        )
+        if problem == "classification":
+            prange.set_description(
+                f"Epoch {epoch+1: >6} | Loss: {loss:>10.5f}" 
+                f" | Accuracy: {aux*100:>10.2f}%"
+            )
+        else:    
+            prange.set_description(
+                f"Epoch {epoch+1: >6} | RMSE: {loss:>10.5f}"
+            )
    
     return state
 
 
 def main(args):
     # Load dataset
-    X, y = load_dataset("ptb-xl", args.beat_segment, None, args.n_channels,
-                        target=args.target)
-    if args.target == "age":
+    X_tr, y_tr, X_te, y_te, _ = load_dataset(
+        args.dataset, args.beat_segment, args.processed, args.n_channels, 
+        target=args.target
+    )
+    if args.target in ("age", "range", "max", "mean"):
         problem = "regression"
         loss_fn = rmse_loss
-    elif args.target == "sex":
+    elif args.target in ("sex", "min-max-order"):
         problem = "classification"
         loss_fn = binary_ce_loss
     else:
@@ -145,12 +161,11 @@ def main(args):
     
     # Shuffle
     key = jr.PRNGKey(args.seed)
-    idx = jr.permutation(key, len(X))
-    X, y = X[idx], y[idx]
-    
-    n_train = int(0.8*len(X))
-    X_tr, X_te = X[:n_train], X[n_train:]
-    y_tr, y_te = y[:n_train], y[n_train:]
+    key, subkey = jr.split(key)
+    idx_tr = jr.permutation(key, len(X_tr))
+    X_tr, y_tr = X_tr[idx_tr], y_tr[idx_tr]
+    idx_te = jr.permutation(subkey, len(X_te))
+    X_te, y_te = X_te[idx_te], y_te[idx_te]
     
     # Train
     state = train(X_tr, y_tr, n_epochs=args.n_epochs, problem=problem)
@@ -163,7 +178,10 @@ def main(args):
         print(f"Test accuracy: {aux_te:.4f}")
     
     # Save checkpoint
-    ckpt_dir = Path(result_path, f"{args.target}")
+    dataset_name = args.dataset
+    if args.processed:
+        dataset_name += "_processed"
+    ckpt_dir = Path(disc_path, dataset_name, f"{args.target}")
     if args.beat_segment:
         ckpt_dir = Path(ckpt_dir, f"cnn_bs_{args.n_channels}_ckpt")
     else:
@@ -178,9 +196,14 @@ if __name__ == "__main__":
     
     parser.add_argument("--seed", type=int, default=0) # random seed
     
+    parser.add_argument("--dataset", type=str, default="ptb-xl",
+                        choices=["mimic-iv", "ptb-xl"],)
     parser.add_argument("--beat_segment", action="store_true") # use beat segmentations
-    parser.add_argument("--target", type=str, default="age")
-    parser.add_argument("--n_channels", type=int, default=3) # number of channels to use
+    parser.add_argument("--processed", action="store_true") # use processed dataset
+    parser.add_argument("--target", type=str, default="age",
+                        choices=["age", "sex", "range", "max",
+                                 "min-max-order", "mean"])
+    parser.add_argument("--n_channels", type=int, default=12) # number of channels to use
     
     parser.add_argument("--n_epochs", type=int, default=100) # number of epochs to train
     
