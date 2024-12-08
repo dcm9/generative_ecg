@@ -4,10 +4,10 @@ import jax.numpy as jnp
 import jax.random as jr
 import orbax.checkpoint as orbax_ckpt
 
-from Generative_ECG.src.generative_ecg.train.train_utils.cnn_utils import create_cnn_train_state
-from Generative_ECG.src.generative_ecg.train.train_utils.dr_vae_utils import train_dr_vae
-from Generative_ECG.src.generative_ecg.models.nn_models import CNN
-from Generative_ECG.src.generative_ecg.models.math_utils import OMAT
+from .cnn_utils import create_cnn_train_state
+from .dr_vae_utils import train_dr_vae
+from ..models.nn_models import CNN
+from ..models.math_utils import OMAT
 
 
 def train_vae(X, ckpt_dir, gen_ckpt_dir, **kwargs):

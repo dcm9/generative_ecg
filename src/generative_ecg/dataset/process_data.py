@@ -8,7 +8,7 @@ import pandas as pd
 import tqdm
 import wfdb
 
-from Generative_ECG.src.generative_ecg.dataset.dataloader_utils.segment_ecg import segment_and_filter_ecg
+from .segment_ecg import segment_and_filter_ecg
 
 def load_data(ecg_filepath=None, sampling_rate=500, test_fold=10, 
               segmentation=False, target="age", processed=False):

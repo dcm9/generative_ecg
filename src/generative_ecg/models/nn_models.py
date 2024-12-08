@@ -5,8 +5,8 @@ import jax.nn.initializers as init
 import jax.numpy as jnp
 
 
-import Generative_ECG.src.generative_ecg.models.layer_utils as layers
-from Generative_ECG.src.generative_ecg.models.math_utils import get_sigmas
+from . import layer_utils as layers
+from .math_utils import get_sigmas
 
 from functools import partial
 from typing import Any, Optional, Sequence

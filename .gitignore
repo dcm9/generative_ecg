@@ -160,3 +160,9 @@ cython_debug/
 #.idea/
 
 .envrc
+
+# data
+data/
+
+# directory import
+**/__init__.py

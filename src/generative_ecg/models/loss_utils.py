@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import optax
 
-from Generative_ECG.src.generative_ecg.models.math_utils import gaussian_kl, gaussian_logpdf, gaussian_sample
+from .math_utils import gaussian_kl, gaussian_logpdf, gaussian_sample
 
 def binary_ce_loss(params, apply_fn, X_batch, y_batch):
     y_preds = jax.vmap(apply_fn, (None, 0))(

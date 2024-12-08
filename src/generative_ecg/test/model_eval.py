@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import jax.random as jnr
-from Generative_ECG.src.generative_ecg.models.loss_utils import rmse, fd
+from ..models.loss_utils import rmse, fd
 
 def evaluate_generated_ecgs(true, gen, sample=10):
     mean_rmses = []

@@ -3,7 +3,7 @@ import jax
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-from Generative_ECG.src.generative_ecg.models.math_utils import OMAT
+from ..models.math_utils import OMAT
 
 def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None,
              title=None, ylim=None):

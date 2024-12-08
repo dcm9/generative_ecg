@@ -10,12 +10,12 @@ import orbax.checkpoint as orbax_ckpt
 import tqdm
 
 
-from Generative_ECG.src.generative_ecg.models.loss_utils import (
+from ..models.loss_utils import (
     rmse_loss,
     binary_ce_loss
 )
 
-from Generative_ECG.src.generative_ecg.models.nn_models import (
+from ..models.nn_models import (
     CNN,
 
 )

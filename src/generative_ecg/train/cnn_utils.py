@@ -3,7 +3,7 @@ from flax.training import train_state
 import jax.random as jr
 import optax
 
-from Generative_ECG.src.generative_ecg.models.nn_models import CNN
+from ..models.nn_models import CNN
 
 def create_cnn_train_state(X, key=0):
     """Creates initial `TrainState`."""

@@ -4,8 +4,8 @@ import jax
 
 from pathlib import Path
 
-from Generative_ECG.src.generative_ecg.dataset.dataloader_utils.process_data import load_data
-from Generative_ECG.src.generative_ecg.models.math_utils import compute_linproj_residual
+from .process_data import load_data
+from ..models.math_utils import compute_linproj_residual
 
 def load_dataset(ecg_filepath=None, beat_segment=False, processed=False, 
                  n_channels=12, verbose=True, target="age", x_len=400, atol=1e-6):

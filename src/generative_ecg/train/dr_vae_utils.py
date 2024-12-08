@@ -11,8 +11,8 @@ import jax.numpy as jnp
 import jax.random as jr
 import optax
 
-from Generative_ECG.src.generative_ecg.models.nn_models import Encoder, Decoder, CNNEncoder
-from Generative_ECG.src.generative_ecg.models.loss_utils import binary_loss
+from ..models.nn_models import Encoder, Decoder, CNNEncoder
+from ..models.loss_utils import binary_loss
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
 def train_step(i, state, batch, encoder_apply, decoder_apply, split_idx,

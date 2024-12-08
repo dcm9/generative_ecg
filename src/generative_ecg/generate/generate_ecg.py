@@ -5,8 +5,8 @@ import jax.random as jr
 import matplotlib.pyplot as plt
 import tqdm
 
-from Generative_ECG.src.generative_ecg.generate.plot_utils import plot_ecg, find_closest_real_ecg
-from Generative_ECG.src.generative_ecg.models.math_utils import OMAT
+from .plot_utils import plot_ecg, find_closest_real_ecg
+from ..models.math_utils import OMAT
 
 CHANNELS = ['I', 'II', 'III', 'aVR', 'aVF', 'aVL', 'V1', 'V2', 'V3', 
             'V4', 'V5', 'V6']
