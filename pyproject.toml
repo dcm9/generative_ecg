@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "mlscience-ekgs"
+name = "generative_ecg"
 version = "0.1.0"
 description = ""
 authors = ["Peter G. Chang <peter0414@gmail.com>"]
@@ -17,6 +17,9 @@ wfdb = "^4.1.2"
 flax = "^0.7.5"
 tensorflow-probability = "^0.23.0"
 tqdm = "^4.66.1"
+scikit-learn = "^1.5.2"
+neurokit2 = "^0.2.10"
+torch = "^2.5.1"
 
 
 [tool.poetry.group.dev.dependencies]
