@@ -1,27 +1,23 @@
-import tqdm
-import jax.numpy as jnp
-import jax
+def load_dataset(X_tr, y_tr, X_te, y_te, ecg_filepath=None, 
+                 beat_segment=False, processed=False, n_channels=12, 
+                 target="age", x_len=400, atol=1e-6):
+    # TODO: add docstring, drop verbose, function should take X, y tr and te as 
+    # input and return processed X, y tr and te; remove n_channels?
+    # if beat_segment:
+    #     sampling_rate = 500
+    # else:
+    #     sampling_rate = 100
 
-from pathlib import Path
-
-from .process_data import load_data
-from ..models.math_utils import compute_linproj_residual
-
-def load_dataset(ecg_filepath=None, beat_segment=False, processed=False, 
-                 n_channels=12, verbose=True, target="age", x_len=400, atol=1e-6):
-    if beat_segment:
-        sampling_rate = 500
-    else:
-        sampling_rate = 100
-
-    X_tr, y_tr, X_te, y_te = load_data(
-        ecg_filepath=ecg_filepath,
-        segmentation=beat_segment, 
-        sampling_rate=sampling_rate,
-        target=target,
-        processed=processed,
-    )
+    # X_tr, y_tr, X_te, y_te = load_data(
+    #     ecg_filepath=ecg_filepath,
+    #     segmentation=beat_segment, 
+    #     sampling_rate=sampling_rate,
+    #     target=target,
+    #     processed=processed,
+    # )
     # Take only the first n channels
+
+
     if not processed:
         X_tr = X_tr[:, :n_channels, :]
         X_te = X_te[:, :n_channels, :]
@@ -29,12 +25,13 @@ def load_dataset(ecg_filepath=None, beat_segment=False, processed=False,
             X_tr = X_tr[:, :, :x_len]
             X_te = X_te[:, :, :x_len]
     
-    if verbose:
-        print(
-            f"Loaded dataset from {ecg_filepath} with shape X_tr: {X_tr.shape},"
-            f"y_tr: {y_tr.shape}, X_te: {X_te.shape}, y_te: {y_te.shape}"
-        )
+    # if verbose:
+    #     print(
+    #         f"Loaded dataset from {ecg_filepath} with shape X_tr: {X_tr.shape},"
+    #         f"y_tr: {y_tr.shape}, X_te: {X_te.shape}, y_te: {y_te.shape}"
+    #     )
 
+    # TODO: this portion is not good, have to change to separate function
     if processed:
         return X_tr, y_tr, X_te, y_te, target
 
@@ -65,9 +62,9 @@ def load_dataset(ecg_filepath=None, beat_segment=False, processed=False,
         y_name = f"y_{target}.npy"
         X_te_name = "X_te.npy"
         y_te_name = f"y_te_{target}.npy"
-    jnp.save(Path(processed_path, X_name), jnp.array(X_proc_tr))
-    jnp.save(Path(processed_path, y_name), jnp.array(y_proc_tr))
-    jnp.save(Path(processed_path, X_te_name), jnp.array(X_proc_te))
-    jnp.save(Path(processed_path, y_te_name), jnp.array(y_proc_te))    
+    # jnp.save(Path(processed_path, X_name), jnp.array(X_proc_tr))
+    # jnp.save(Path(processed_path, y_name), jnp.array(y_proc_tr))
+    # jnp.save(Path(processed_path, X_te_name), jnp.array(X_proc_te))
+    # jnp.save(Path(processed_path, y_te_name), jnp.array(y_proc_te))    
     
     return X_proc_tr, y_proc_tr, X_proc_te, y_proc_te, target
