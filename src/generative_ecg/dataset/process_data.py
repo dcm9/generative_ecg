@@ -9,37 +9,8 @@ from .process_data import load_data
 from ..models.math_utils import compute_linproj_residual
 from .segment_ecg import segment_and_filter_ecg
 
-def _load_targets(X, target):
-    """
-    Helper function to load the targets
-
-    Args:
-        X (ndarray): The input data.
-        target (str): The target type.
-
-    Returns:
-        ndarray: The target variable.
-    """
-    if target == "range":
-        def _compute_range(x):
-            return jnp.max(x) - jnp.min(x)
-        targets = jax.vmap(_compute_range)(X)
-    elif target == "max":
-        targets = jax.vmap(jnp.max)(X)
-    elif target == "mean":
-        targets = jax.vmap(jnp.mean)(X)
-    elif target == "min-max-order":
-        def _compute_min_max_order(x):
-            min_idx, max_idx = jnp.argmin(x), jnp.argmax(x)
-            return (min_idx < max_idx).astype(jnp.float32)
-        targets = jax.vmap(_compute_min_max_order)(X)
-    else:
-        raise ValueError(f"Unknown target: {target}")
-
-    return targets
-
 # def load_processed_dataset(ecg_filepath=None, beat_segment=False, target="age"):
-def load_unprocessed_dataset(X, y, target="age", beat_segment=False, n_channels=12, 
+def load_unprocessed_dataset(X, y, targets, beat_segment=False, n_channels=12, 
                              x_len=400, atol=1e-6):
     X = X[:, :n_channels, :]
 

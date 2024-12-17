@@ -1,5 +1,5 @@
 import jax
-import jax.numpy as jnp
+import jax.numpy
 import optax
 
 from .math_utils import gaussian_kl, gaussian_logpdf, gaussian_sample
@@ -9,7 +9,7 @@ def binary_ce_loss(params, apply_fn, X_batch, y_batch):
         params, X_batch
     ).ravel()
     y_preds_labels = jax.nn.sigmoid(y_preds) > 0.5
-    accuracy = jnp.mean(y_preds_labels == y_batch)
+    accuracy = jax.numpy.mean(y_preds_labels == y_batch)
     loss = optax.sigmoid_binary_cross_entropy(y_preds, y_batch).mean()
     
     return loss, accuracy
@@ -18,7 +18,7 @@ def rmse_loss(params, apply_fn, X_batch, y_batch):
     y_preds = jax.vmap(apply_fn, (None, 0))(
         params, X_batch
     ).ravel()
-    loss = jnp.sqrt(jnp.mean((y_preds - y_batch)**2))
+    loss = jax.numpy.sqrt(jax.numpy.mean((y_preds - y_batch)**2))
     
     return loss, loss
 

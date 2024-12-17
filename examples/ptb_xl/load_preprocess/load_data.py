@@ -1,8 +1,35 @@
-def load_dataset(X_tr, y_tr, X_te, y_te, ecg_filepath=None, 
+def _load_targets(X, target):
+    """
+    Helper function to load the targets
+
+    Args:
+        X (ndarray): The input data.
+        target (str): The target type.
+
+    Returns:
+        ndarray: The target variable.
+    """
+    if target == "range":
+        def _compute_range(x):
+            return jax.numpy.max(x) - jax.numpy.min(x)
+        targets = jax.vmap(_compute_range)(X)
+    elif target == "max":
+        targets = jax.vmap(jax.numpy.max)(X)
+    elif target == "mean":
+        targets = jax.vmap(jax.numpy.mean)(X)
+    elif target == "min-max-order":
+        def _compute_min_max_order(x):
+            min_idx, max_idx = jax.numpy.argmin(x), jax.numpy.argmax(x)
+            return (min_idx < max_idx).astype(jax.numpy.float32)
+        targets = jax.vmap(_compute_min_max_order)(X)
+    else:
+        raise ValueError(f"Unknown target: {target}")
+
+    return targets
+
+def load_dataset(X_tr, y_tr, X_te, y_te, ecg_filepath=None,
                  beat_segment=False, processed=False, n_channels=12, 
                  target="age", x_len=400, atol=1e-6):
-    # TODO: add docstring, drop verbose, function should take X, y tr and te as 
-    # input and return processed X, y tr and te; remove n_channels?
     # if beat_segment:
     #     sampling_rate = 500
     # else:
@@ -31,7 +58,7 @@ def load_dataset(X_tr, y_tr, X_te, y_te, ecg_filepath=None,
     #         f"y_tr: {y_tr.shape}, X_te: {X_te.shape}, y_te: {y_te.shape}"
     #     )
 
-    # TODO: this portion is not good, have to change to separate function
+
     if processed:
         return X_tr, y_tr, X_te, y_te, target
 

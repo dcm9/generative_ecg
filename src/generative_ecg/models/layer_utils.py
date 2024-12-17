@@ -4,7 +4,7 @@ from typing import Any, Optional, Sequence
 import flax.linen as nn
 import jax
 import jax.nn.initializers as init
-import jax.numpy as jnp
+import jax.numpy
 
 class ConditionalInstanceNorm2dPlus(nn.Module):
     """InstanceNorm++ as proposed in the original NCSN paper."""
@@ -13,7 +13,7 @@ class ConditionalInstanceNorm2dPlus(nn.Module):
     eps: float = 1e-5
     
     @staticmethod
-    def init_embed(key, shape, dtype=jnp.float32, bias=True):
+    def init_embed(key, shape, dtype=jax.numpy.float32, bias=True):
         feature_size = shape[1] // 3
         normal_init = init.normal(0.02)
         normal = normal_init(
@@ -21,19 +21,19 @@ class ConditionalInstanceNorm2dPlus(nn.Module):
         ) + 1.
         zero = init.zeros(key, (shape[0], feature_size), dtype=dtype)
         if bias:
-            return jnp.concatenate([normal, zero], axis=-1)
+            return jax.numpy.concatenate([normal, zero], axis=-1)
         else:
             return normal
 
     @nn.compact
     def __call__(self, x, y):
-        means = jnp.mean(x, axis=1)
-        m = jnp.mean(means, axis=-1, keepdims=True)
-        v = jnp.var(means, axis=-1, keepdims=True)
-        means_plus = (means - m) / jnp.sqrt(v + self.eps)
+        means = jax.numpy.mean(x, axis=1)
+        m = jax.numpy.mean(means, axis=-1, keepdims=True)
+        v = jax.numpy.var(means, axis=-1, keepdims=True)
+        means_plus = (means - m) / jax.numpy.sqrt(v + self.eps)
 
         h = (x - means[:, None, :]) \
-            / jnp.sqrt(jnp.var(x, axis=(1, 2), keepdims=True) + self.eps)
+            / jax.numpy.sqrt(jax.numpy.var(x, axis=(1, 2), keepdims=True) + self.eps)
         
         embed = nn.Embed(
             num_embeddings=self.num_classes, 
@@ -42,10 +42,10 @@ class ConditionalInstanceNorm2dPlus(nn.Module):
         )
         
         if self.bias:
-            gamma, alpha, beta = jnp.split(embed(y), 3, axis=-1)
+            gamma, alpha, beta = jax.numpy.split(embed(y), 3, axis=-1)
         else:
-            gamma, alpha = jnp.split(embed(y), 2, axis=-1)
-            beta = jnp.zeros_like(alpha)
+            gamma, alpha = jax.numpy.split(embed(y), 2, axis=-1)
+            beta = jax.numpy.zeros_like(alpha)
 
         h = h + means_plus[:, None, :] * alpha[:, None, :]
         h = h * gamma[:, None, :]
@@ -164,7 +164,7 @@ class CondMSFBlock(nn.Module):
 
     @nn.compact
     def __call__(self, xs, y):
-        sums = jnp.zeros((xs[0].shape[0], *self.shape, self.features))
+        sums = jax.numpy.zeros((xs[0].shape[0], *self.shape, self.features))
         for i in range(len(xs)):
             h = self.normalizer()(xs[i], y)
             h = ncsn_conv(h, self.features, stride=1, bias=True, kernel_size=3)

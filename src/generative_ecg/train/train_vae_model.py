@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import jax.numpy as jnp
-import jax.random as jr
+import jax.numpy
+import jax.random
 import orbax.checkpoint as orbax_ckpt
 
 from .cnn_utils import create_cnn_train_state
@@ -61,25 +61,25 @@ def train_vae(X, ckpt_dir, gen_ckpt_dir, **kwargs):
                             beta1_scheduler_type=kwargs["beta1_scheduler"],)
 
     with open(Path(gen_ckpt_dir, "params_enc.npy"), "wb") as f:
-        jnp.save(f, result["params_enc"])
+        jax.numpy.save(f, result["params_enc"])
     with open(Path(gen_ckpt_dir, "params_dec.npy"), "wb") as f:
-        jnp.save(f, result["params_dec"])
+        jax.numpy.save(f, result["params_dec"])
     with open(Path(gen_ckpt_dir, "mu_mean.npy"), "wb") as f:
-        jnp.save(f, result["mu_mean"])
+        jax.numpy.save(f, result["mu_mean"])
     with open(Path(gen_ckpt_dir, "mu_std.npy"), "wb") as f:
-        jnp.save(f, result["mu_std"])
+        jax.numpy.save(f, result["mu_std"])
     with open(Path(gen_ckpt_dir, "sigmasq_mean.npy"), "wb") as f:
-        jnp.save(f, result["sigmasq_mean"])
+        jax.numpy.save(f, result["sigmasq_mean"])
     with open(Path(gen_ckpt_dir, "sigmasq_std.npy"), "wb") as f:
-        jnp.save(f, result["sigmasq_std"])
+        jax.numpy.save(f, result["sigmasq_std"])
     with open(Path(gen_ckpt_dir, "losses.npy"), "wb") as f:
-        jnp.save(f, result["losses"])
+        jax.numpy.save(f, result["losses"])
     with open(Path(gen_ckpt_dir, "losses_rec.npy"), "wb") as f:
-        jnp.save(f, result["losses_rec"])
+        jax.numpy.save(f, result["losses_rec"])
     with open(Path(gen_ckpt_dir, "losses_kl.npy"), "wb") as f:
-        jnp.save(f, result["losses_kl"])
+        jax.numpy.save(f, result["losses_kl"])
     with open(Path(gen_ckpt_dir, "losses_dr.npy"), "wb") as f:
-        jnp.save(f, result["losses_dr"])
+        jax.numpy.save(f, result["losses_dr"])
 
     return result
 

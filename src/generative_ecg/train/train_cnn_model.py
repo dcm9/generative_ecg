@@ -4,8 +4,8 @@ from pathlib import Path
 from flax.training import train_state, orbax_utils
 import jax
 import optax
-import jax.numpy as jnp
-import jax.random as jr
+import jax.numpy
+import jax.random
 import orbax.checkpoint as orbax_ckpt
 import tqdm
 
@@ -34,9 +34,9 @@ def update_step(state, apply_fn, X_batch, y_batch, problem="classification"):
 def train_epoch(X, y, state, apply_fn, batch_size=128, key=0, 
                 problem="classification"):
     if isinstance(key, int):
-        key = jr.PRNGKey(key)
+        key = jax.random.PRNGKey(key)
     n_train = len(X)
-    idx = jr.permutation(key, n_train)
+    idx = jax.random.permutation(key, n_train)
     X, y = X[idx], y[idx]
     n_batches = n_train // batch_size
     rem = n_train % batch_size
@@ -50,8 +50,8 @@ def train_epoch(X, y, state, apply_fn, batch_size=128, key=0,
                                   problem=problem)
         losses.append(loss)
         auxes.append(aux)
-    loss = jnp.array(losses).mean()
-    aux = jnp.array(auxes).mean()
+    loss = jax.numpy.array(losses).mean()
+    aux = jax.numpy.array(auxes).mean()
 
     return state, loss, aux
 
@@ -59,7 +59,7 @@ def train_epoch(X, y, state, apply_fn, batch_size=128, key=0,
 def train_cnn(X, y, lr_init=1e-3, lr_peak=1e-2, lr_end=1e-3, n_epochs=10, 
           batch_size=64, key=0, problem="classification"):
     if isinstance(key, int):
-        key = jr.PRNGKey(key)
+        key = jax.random.PRNGKey(key)
     model = CNN(
         output_dim=1
     )
@@ -122,11 +122,11 @@ def train_discriminator(X_tr, y_tr, X_te, y_te, result_path, seed:int=0,
         raise ValueError(f"Unknown target: {target}")
     
     # Shuffle
-    key = jr.PRNGKey(seed)
-    key, subkey = jr.split(key)
-    idx_tr = jr.permutation(key, len(X_tr))
+    key = jax.random.PRNGKey(seed)
+    key, subkey = jax.random.split(key)
+    idx_tr = jax.random.permutation(key, len(X_tr))
     X_tr, y_tr = X_tr[idx_tr], y_tr[idx_tr]
-    idx_te = jr.permutation(subkey, len(X_te))
+    idx_te = jax.random.permutation(subkey, len(X_te))
     X_te, y_te = X_te[idx_te], y_te[idx_te]
     
     # Train

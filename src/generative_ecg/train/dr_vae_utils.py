@@ -7,8 +7,8 @@ from flax.training import train_state
 import jax
 from jax.flatten_util import ravel_pytree
 from jax.tree_util import tree_map
-import jax.numpy as jnp
-import jax.random as jr
+import jax.numpy
+import jax.random
 import optax
 
 from ..models.nn_models import Encoder, Decoder, CNNEncoder
@@ -17,15 +17,15 @@ from ..models.loss_utils import binary_loss
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
 def train_step(i, state, batch, encoder_apply, decoder_apply, split_idx,
                pred_fn, beta1_scheduler, beta2):
-    key = jr.PRNGKey(i)
+    key = jax.random.PRNGKey(i)
     beta1 = 1 - beta1_scheduler(i)
     binary_loss_fn = lambda params, key, input: binary_loss(
         key, params, split_idx, input, encoder_apply, decoder_apply,
         pred_fn, beta1, beta2
     )
-    keys = jr.split(key, len(batch))
+    keys = jax.random.split(key, len(batch))
     loss_fn = lambda params: tree_map(
-        lambda x: jnp.mean(x),
+        lambda x: jax.numpy.mean(x),
         jax.vmap(binary_loss_fn, (None, 0, 0))(params, keys, batch)
     )
     (loss, (loss_rec, loss_kl, dr_reg_val)), grads = \
@@ -43,17 +43,17 @@ def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
     assert beta1_scheduler_type in ["constant", "linear", "cosine",
                                     "warmup_cosine", "cyclical"]
     if isinstance(key, int):
-        key = jr.PRNGKey(key)
+        key = jax.random.PRNGKey(key)
 
     _, *x_dim = X_train.shape
-    x_dim = jnp.array(x_dim)
+    x_dim = jax.numpy.array(x_dim)
     n = len(X_train)
 
     hidden_feats = [hidden_width] * hidden_depth
     encoder_feats = [*hidden_feats, z_dim]
-    decoder_feats = [*hidden_feats, jnp.prod(x_dim)]
+    decoder_feats = [*hidden_feats, jax.numpy.prod(x_dim)]
 
-    key_enc, key_dec = jr.split(key)
+    key_enc, key_dec = jax.random.split(key)
 
     # Encoder
     if encoder_type == "mlp":
@@ -62,7 +62,7 @@ def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
         encoder = CNNEncoder(z_dim)
     else:
         raise ValueError(f"Unknown encoder type: {encoder_type}")
-    params_enc = encoder.init(key_enc, jnp.ones(x_dim,))['params']
+    params_enc = encoder.init(key_enc, jax.numpy.ones(x_dim,))['params']
     params_enc, unflatten_fn_enc = ravel_pytree(params_enc)
     print(f"Encoder params size: {params_enc.shape}")
     apply_fn_enc = lambda params, x: encoder.apply(
@@ -71,13 +71,13 @@ def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
 
     # Decoder
     decoder = Decoder(decoder_feats, use_bias=use_bias)
-    params_dec = decoder.init(key_dec, jnp.ones(z_dim,))['params']
+    params_dec = decoder.init(key_dec, jax.numpy.ones(z_dim,))['params']
     params_dec, unflatten_fn_dec = ravel_pytree(params_dec)
     print(f"Decoder params size: {params_dec.shape}")
     apply_fn_dec = lambda params, x: decoder.apply(
         {'params': unflatten_fn_dec(params)}, x
     )
-    params = jnp.array([*params_enc, *params_dec])
+    params = jax.numpy.array([*params_enc, *params_dec])
     split_idx = len(params_enc)
 
     # Train state
@@ -121,8 +121,8 @@ def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
     else:
         raise ValueError(f"Unknown beta1 scheduler type: {beta1_scheduler_type}")
     for epoch in pbar:
-        key = jr.PRNGKey(epoch)
-        idx = jr.permutation(key, n)
+        key = jax.random.PRNGKey(epoch)
+        idx = jax.random.permutation(key, n)
         X_train = X_train[idx]
         n_batch = n // batch_size
         if n % batch_size != 0:
@@ -142,7 +142,7 @@ def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
             losses_dr.append(dr_reg_val)
             ctr += 1
         pbar.set_description(f"Epoch {epoch} average loss: "
-                             f"{jnp.mean(jnp.array(losses_epoch))}")
+                             f"{jax.numpy.mean(jax.numpy.array(losses_epoch))}")
         losses.extend(losses_epoch)
     
     # Compute statistics of encoded moments
@@ -152,12 +152,12 @@ def train_dr_vae(pred_fn, X_train, beta1, beta2, z_dim,
 
     carry_init = apply_fn_enc(state.params[:split_idx], X_train[0])
     _, (mus, sigmasqs) = jax.lax.scan(_step, carry_init, X_train)
-    mu_mean, mu_std = jnp.mean(mus, axis=0), jnp.std(mus, axis=0)
-    sigmasq_mean, sigmasq_std = jnp.mean(sigmasqs, axis=0), \
-        jnp.std(sigmasqs, axis=0)
+    mu_mean, mu_std = jax.numpy.mean(mus, axis=0), jax.numpy.std(mus, axis=0)
+    sigmasq_mean, sigmasq_std = jax.numpy.mean(sigmasqs, axis=0), \
+        jax.numpy.std(sigmasqs, axis=0)
     
-    losses, losses_rec, losses_kl, losses_dr = jnp.array(losses), \
-        jnp.array(losses_rec), jnp.array(losses_kl), jnp.array(losses_dr)
+    losses, losses_rec, losses_kl, losses_dr = jax.numpy.array(losses), \
+        jax.numpy.array(losses_rec), jax.numpy.array(losses_kl), jax.numpy.array(losses_dr)
     
     params_enc, params_dec = state.params[:split_idx], state.params[split_idx:]
     result = {

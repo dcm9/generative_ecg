@@ -1,6 +1,6 @@
 from typing import Callable, Sequence
 from flax.training import train_state
-import jax.random as jr
+import jax.random
 import optax
 
 from ..models.nn_models import CNN
@@ -9,8 +9,8 @@ def create_cnn_train_state(X, key=0):
     """Creates initial `TrainState`."""
     # Initialize NN model
     if isinstance(key, int):
-        key = jr.PRNGKey(key)
-    key, subkey = jr.split(key)
+        key = jax.random.PRNGKey(key)
+    key, subkey = jax.random.split(key)
     nn_model = CNN(output_dim=1)
     params = nn_model.init(key, X[0])
 

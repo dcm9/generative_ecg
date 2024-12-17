@@ -1,4 +1,4 @@
-import jax.numpy as jnp
+import jax.numpy
 import jax
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -45,13 +45,13 @@ def find_closest_real_ecg(real_ecgs, ecg, processed=False):
     def _compute_rmse(carry, real_ecg):
         if processed:
             real_ecg = OMAT @ real_ecg
-        rmse = jnp.sqrt(jnp.mean((real_ecg - ecg)**2))
+        rmse = jax.numpy.sqrt(jax.numpy.mean((real_ecg - ecg)**2))
         return rmse, rmse
     
     _, rmses = jax.lax.scan(_compute_rmse, 0.0, real_ecgs)
-    closest_ecg = real_ecgs[jnp.argmin(rmses)]
+    closest_ecg = real_ecgs[jax.numpy.argmin(rmses)]
     if processed:
         closest_ecg = OMAT @ closest_ecg
-    min_rmse = jnp.min(rmses)
+    min_rmse = jax.numpy.min(rmses)
     
     return closest_ecg, min_rmse
