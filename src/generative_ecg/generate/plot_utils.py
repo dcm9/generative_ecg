@@ -1,13 +1,13 @@
 import jax.numpy
 import jax
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
+import matplotlib.gridspec 
+import matplotlib.pyplot 
 
 from ..models.math_utils import OMAT
 
 def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None,
              title=None, ylim=None):
-    fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = matplotlib.pyplot.subplots(figsize=figsize)
     ax.set_xticks([])
     ax.set_yticks([])
     gs = gridspec.GridSpec(n_channels, 1, height_ratios=[1,] * n_channels)
@@ -16,9 +16,9 @@ def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None,
     axes = []
     for i in range(n_channels):
         if i == 0:
-            ax = plt.subplot(gs[i])
+            ax = matplotlib.pyplot.subplot(gs[i])
         else:
-            ax = plt.subplot(gs[i], sharex=axes[0])
+            ax = matplotlib.pyplot.subplot(gs[i], sharex=axes[0])
         axes.append(ax)
 
     for i, (ax, data) in enumerate(zip(axes, channel_data)):

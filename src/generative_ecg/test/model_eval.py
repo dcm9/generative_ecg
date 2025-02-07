@@ -16,8 +16,8 @@ def evaluate_generated_ecgs(true, gen, sample=10):
             rmses.append(rmse(sample, ecg))
             fds.append(fd(sample, ecg))
         
-    print(f"Mean of Frechet Distance of {len(gen)} synthetic ECGS and {sample}-sample true ECGS: {jax.numpy.mean(mean_fds)}")
-    print(f"Mean of RMSE of {len(gen)} synthetic ECGS and {sample}-sample true ECGS: {jax.numpy.mean(mean_rmses)}")
+    # print(f"Mean of Frechet Distance of {len(gen)} synthetic ECGS and {sample}-sample true ECGS: {jax.numpy.mean(mean_fds)}")
+    # print(f"Mean of RMSE of {len(gen)} synthetic ECGS and {sample}-sample true ECGS: {jax.numpy.mean(mean_rmses)}")
 
     return jax.numpy.mean(mean_fds), jax.numpy.mean(mean_fds)
     

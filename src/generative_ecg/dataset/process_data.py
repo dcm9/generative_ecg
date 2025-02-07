@@ -12,6 +12,7 @@ from .segment_ecg import segment_and_filter_ecg
 # def load_processed_dataset(ecg_filepath=None, beat_segment=False, target="age"):
 def load_unprocessed_dataset(X, y, targets, beat_segment=False, n_channels=12, 
                              x_len=400, atol=1e-6):
+    #TODO: remove n_channels, put in examples
     X = X[:, :n_channels, :]
 
     if beat_segment:

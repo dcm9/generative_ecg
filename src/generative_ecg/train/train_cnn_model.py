@@ -6,7 +6,7 @@ import jax
 import optax
 import jax.numpy
 import jax.random
-import orbax.checkpoint as orbax_ckpt
+import orbax.checkpoint 
 import tqdm
 
 
@@ -148,7 +148,7 @@ def train_discriminator(X_tr, y_tr, X_te, y_te, result_path, seed:int=0,
         ckpt_dir = Path(ckpt_dir, f"cnn_bs_{n_channels}_ckpt")
     else:
         ckpt_dir = Path(ckpt_dir, f"cnn_{n_channels}_ckpt")
-    ckptr = orbax_ckpt.Checkpointer(orbax_ckpt.PyTreeCheckpointHandler())
+    ckptr = orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler())
     save_args = orbax_utils.save_args_from_target(state)
     ckptr.save(ckpt_dir, state, force=True, save_args=save_args)
 

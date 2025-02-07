@@ -1,19 +1,12 @@
-from functools import partial
-from typing import Sequence
-from tqdm import tqdm
-
-import flax.linen as nn
-from flax.training import train_state
 import jax
 from jax.flatten_util import ravel_pytree
 from jax.tree_util import tree_map
 import jax.numpy
 import jax.random
-import optax
-import tensorflow_probability.substrates.jax as tfp
+import tensorflow_probability.substrates.jax 
 
 
-tfd = tfp.distributions
+tfd = tensorflow_probability.substrates.jax.distributions
 MVN = tfd.MultivariateNormalTriL
 MVD = tfd.MultivariateNormalDiag
 Normal = tfd.Normal

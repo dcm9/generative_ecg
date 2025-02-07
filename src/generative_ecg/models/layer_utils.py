@@ -1,12 +1,12 @@
 from functools import partial
 from typing import Any, Optional, Sequence
 
-import flax.linen as nn
+import flax.linen 
 import jax
-import jax.nn.initializers as init
+import jax.nn.initializers 
 import jax.numpy
 
-class ConditionalInstanceNorm2dPlus(nn.Module):
+class ConditionalInstanceNorm2dPlus(flax.linen.Module):
     """InstanceNorm++ as proposed in the original NCSN paper."""
     num_classes: int = 10
     bias: bool = True
@@ -25,7 +25,7 @@ class ConditionalInstanceNorm2dPlus(nn.Module):
         else:
             return normal
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, x, y):
         means = jax.numpy.mean(x, axis=1)
         m = jax.numpy.mean(means, axis=-1, keepdims=True)
@@ -35,7 +35,7 @@ class ConditionalInstanceNorm2dPlus(nn.Module):
         h = (x - means[:, None, :]) \
             / jax.numpy.sqrt(jax.numpy.var(x, axis=(1, 2), keepdims=True) + self.eps)
         
-        embed = nn.Embed(
+        embed = flax.linen.Embed(
             num_embeddings=self.num_classes, 
             features=x.shape[-1] * 3, 
             embedding_init=partial(self.init_embed, bias=self.bias)
@@ -61,7 +61,7 @@ def ncsn_conv(x, out_planes, stride=1, bias=True, dilation=1, init_scale=1.,
     kernel_shape = (kernel_size, kernel_size) + (x.shape[-1], out_planes)
     bias_init = lambda key, shape, dtype: \
         kernel_init(key, kernel_shape)[0, 0, 0, :]
-    output = nn.Conv(
+    output = flax.linen.Conv(
         out_planes, kernel_size=(kernel_size, kernel_size), 
         strides=(stride, stride), padding='SAME', use_bias=bias, 
         kernel_dilation=(dilation, dilation),
@@ -71,14 +71,14 @@ def ncsn_conv(x, out_planes, stride=1, bias=True, dilation=1, init_scale=1.,
     return output
 
 
-class ConvMeanPool(nn.Module):
+class ConvMeanPool(flax.linen.Module):
     output_dim: int
     kernel_size: int = 3
     biases: bool = True
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, inputs):
-        output = nn.Conv(
+        output = flax.linen.Conv(
             features=self.output_dim, 
             kernel_size=(self.kernel_size, self.kernel_size),
             strides=(1, 1), padding='SAME', use_bias=self.biases
@@ -90,14 +90,14 @@ class ConvMeanPool(nn.Module):
         return output
 
 
-class ConditionalResidualBlock(nn.Module):
+class ConditionalResidualBlock(flax.linen.Module):
     output_dim: int
     normalizer: Any
     resample: Optional[str] = None
-    activation: Any = nn.elu
+    activation: Any = flax.linen.elu
     dilation: int = 1
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, x, y):
         h = self.normalizer()(x, y)
         h = self.activation(h)
@@ -135,14 +135,14 @@ class ConditionalResidualBlock(nn.Module):
         return h + shortcut
     
 
-class CondRCUBlock(nn.Module):
+class CondRCUBlock(flax.linen.Module):
     features: int
     n_blocks: int
     n_stages: int
     normalizer: Any
-    activation: Any = nn.elu
+    activation: Any = flax.linen.elu
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, x, y):
         for _ in range(self.n_blocks):
             residual = x
@@ -156,13 +156,13 @@ class CondRCUBlock(nn.Module):
         return x
     
 
-class CondMSFBlock(nn.Module):
+class CondMSFBlock(flax.linen.Module):
     shape: Sequence[int]
     features: int
     normalizer: Any
     interpolation: str = 'bilinear'
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, xs, y):
         sums = jax.numpy.zeros((xs[0].shape[0], *self.shape, self.features))
         for i in range(len(xs)):
@@ -185,19 +185,19 @@ class CondMSFBlock(nn.Module):
         return sums
     
 
-class CondCRPBlock(nn.Module):
+class CondCRPBlock(flax.linen.Module):
     features: int
     n_stages: int
     normalizer: Any
-    activation: Any = nn.elu
+    activation: Any = flax.linen.elu
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, x, y):
         x = self.activation(x)
         path = x
         for _ in range(self.n_stages):
             path = self.normalizer()(path, y)
-            path = nn.avg_pool(
+            path = flax.linen.avg_pool(
                 path, window_shape=(5, 5), strides=(1, 1), padding='SAME'
             )
             path = ncsn_conv(path, self.features, stride=1, bias=False,
@@ -207,16 +207,16 @@ class CondCRPBlock(nn.Module):
         return x
 
     
-class CondRefineBlock(nn.Module):
+class CondRefineBlock(flax.linen.Module):
     output_shape: Sequence[int]
     features: int
     normalizer: Any
-    activation: Any = nn.elu
+    activation: Any = flax.linen.elu
     interpolation: str = 'bilinear'
     start: bool = False
     end: bool = False
 
-    @nn.compact
+    @flax.linen.compact
     def __call__(self, xs, y):
         hs = []
         for i in range(len(xs)):

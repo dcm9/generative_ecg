@@ -2,7 +2,7 @@ from pathlib import Path
 
 import jax.numpy
 import jax.random
-import matplotlib.pyplot as plt
+import matplotlib.pyplot 
 import tqdm
 
 from .plot_utils import plot_ecg, find_closest_real_ecg
@@ -51,7 +51,7 @@ def generate_and_save_ecgs(X, result, gen_result_path, **kwargs):
                             (6, kwargs["n_channels"]+1), 
                             title=f"ECG {i+1}")
         fig.savefig(Path(gen_result_path, f"ecg_{i+1}.png"))
-        plt.close("all")
+        matplotlib.pyplot.close("all")
         
         if kwargs["find_closest_real"]:
             ecg_c, dist = find_closest_real_ecg(X, x, kwargs["processed"])
@@ -62,7 +62,7 @@ def generate_and_save_ecgs(X, result, gen_result_path, **kwargs):
                 title=f"Closest real ECG {i+1}, dist: {dist:.3f}"
             )
             fig.savefig(Path(gen_result_path, f"ecg_{i+1}_closest.png"))
-        plt.close("all")
+        matplotlib.pyplot.close("all")
     if rmses:
         rmses = jax.numpy.array(rmses)
         print(f"\nClosest real ECG:")

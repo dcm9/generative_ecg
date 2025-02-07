@@ -67,7 +67,9 @@ def _filter_beats(beats, beat_windows, rpeaks, range_cutoff, sd_cutoff,
     beats_filtered = torch.tensor([])
 
     for i, beat in enumerate(beats):
+        # save difference as variable 
         if torch.mean(torch.max(beat, dim=1)[0] - torch.min(beat, dim=1)[0]).item() > range_cutoff:
+            # save mean as variable
             if torch.mean(torch.std(beat, dim=1)).item() > sd_cutoff:
                 if not dup_peaks[i]:
                     beats_filtered  = torch.cat((beats_filtered, beat))

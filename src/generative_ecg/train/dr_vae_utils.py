@@ -2,7 +2,7 @@ from functools import partial
 from typing import Sequence
 from tqdm import tqdm
 
-import flax.linen as nn
+import flax.linen 
 from flax.training import train_state
 import jax
 from jax.flatten_util import ravel_pytree

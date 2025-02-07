@@ -2,9 +2,9 @@ from pathlib import Path
 
 import ast
 import jax
-import jax.numpy as jnp
-import numpy as np
-import pandas as pd
+import jax.numpy 
+import numpy 
+import pandas 
 import tqdm
 import wfdb
 
@@ -57,7 +57,7 @@ def load_data(ecg_filepath=None, sampling_rate=500, test_fold=10,
     y_te_path = Path(processed_path, y_te_name)
 
 
-    df_annot = pd.read_csv(
+    df_annot = pandas.read_csv(
         Path(ecg_filepath, "ptbxl_database.csv"), 
         index_col="ecg_id"
     )
@@ -73,20 +73,20 @@ def load_data(ecg_filepath=None, sampling_rate=500, test_fold=10,
     for i, f in enumerate(tqdm.tqdm(file_paths, desc="Loading data from records")):
         data.append(wfdb.rdsamp(Path(ecg_filepath, f)))
 
-    X = np.array([signal for signal, _ in data])
+    X = numpy.array([signal for signal, _ in data])
     if target in df_annot.columns:
         y = df_annot[target].values
-        y_tr = y[np.where(df_annot.strat_fold != test_fold)]
-        y_te = y[np.where(df_annot.strat_fold == test_fold)]
+        y_tr = y[numpy.where(df_annot.strat_fold != test_fold)]
+        y_te = y[numpy.where(df_annot.strat_fold == test_fold)]
     else:
         if segmentation:
             y_tr, y_te = None, None
         else:
             y = _load_targets(X, target)
-            y_tr = y[np.where(df_annot.strat_fold != test_fold)]
-            y_te = y[np.where(df_annot.strat_fold == test_fold)]
-    X_tr = X[np.where(df_annot.strat_fold != test_fold)]
-    X_te = X[np.where(df_annot.strat_fold == test_fold)]
+            y_tr = y[numpy.where(df_annot.strat_fold != test_fold)]
+            y_te = y[numpy.where(df_annot.strat_fold == test_fold)]
+    X_tr = X[numpy.where(df_annot.strat_fold != test_fold)]
+    X_te = X[numpy.where(df_annot.strat_fold == test_fold)]
     X_tr = X_tr.transpose(0, 2, 1)
     X_te = X_te.transpose(0, 2, 1)
 
@@ -113,10 +113,10 @@ def _load_processed_data(processed_path, X_name, y_name, X_te_name, y_te_name):
     y_te_path = Path(processed_path, y_te_name)
 
     try:
-        X_tr = np.load(X_path)
-        y_tr = np.load(y_path)
-        X_te = np.load(X_te_path)
-        y_te = np.load(y_te_path)
+        X_tr = numpy.load(X_path)
+        y_tr = numpy.load(y_path)
+        X_te = numpy.load(X_te_path)
+        y_te = numpy.load(y_te_path)
     except:
         raise ValueError("Processed data not found.")
 
@@ -135,16 +135,16 @@ def _load_targets(X, target):
     """
     if target == "range":
         def _compute_range(x):
-            return jnp.max(x) - jnp.min(x)
+            return jax.numpy.max(x) - jax.numpy.min(x)
         targets = jax.vmap(_compute_range)(X)
     elif target == "max":
-        targets = jax.vmap(jnp.max)(X)
+        targets = jax.vmap(jax.numpy.max)(X)
     elif target == "mean":
-        targets = jax.vmap(jnp.mean)(X)
+        targets = jax.vmap(jax.numpy.mean)(X)
     elif target == "min-max-order":
         def _compute_min_max_order(x):
-            min_idx, max_idx = jnp.argmin(x), jnp.argmax(x)
-            return (min_idx < max_idx).astype(jnp.float32)
+            min_idx, max_idx = jax.numpy.argmin(x), jax.numpy.argmax(x)
+            return (min_idx < max_idx).astype(jax.numpy.float32)
         targets = jax.vmap(_compute_min_max_order)(X)
     else:
         raise ValueError(f"Unknown target: {target}")
@@ -186,9 +186,9 @@ def _create_train_test_files(segmentation, sampling_rate, target, X_tr, y_tr,
                         targets.extend(curr_targets)
                 except:
                     continue
-            X_curr, y_curr = np.array(beats), np.array(targets)
+            X_curr, y_curr = numpy.array(beats), numpy.array(targets)
             print(X_curr.shape, y_curr.shape)
         else:
             X_curr, y_curr = XX, yy
-        np.save(XX_path, X_curr)
-        np.save(yy_path, y_curr)
+        numpy.save(XX_path, X_curr)
+        numpy.save(yy_path, y_curr)
