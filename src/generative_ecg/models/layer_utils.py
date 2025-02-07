@@ -15,11 +15,11 @@ class ConditionalInstanceNorm2dPlus(flax.linen.Module):
     @staticmethod
     def init_embed(key, shape, dtype=jax.numpy.float32, bias=True):
         feature_size = shape[1] // 3
-        normal_init = init.normal(0.02)
+        normal_init = jax.nn.initializers.normal(0.02)
         normal = normal_init(
             key, (shape[0], 2 * feature_size), dtype=dtype
         ) + 1.
-        zero = init.zeros(key, (shape[0], feature_size), dtype=dtype)
+        zero = jax.nn.initializers.zeros(key, (shape[0], feature_size), dtype=dtype)
         if bias:
             return jax.numpy.concatenate([normal, zero], axis=-1)
         else:
@@ -57,7 +57,7 @@ class ConditionalInstanceNorm2dPlus(flax.linen.Module):
 def ncsn_conv(x, out_planes, stride=1, bias=True, dilation=1, init_scale=1., 
               kernel_size=1):
     init_scale = 1e-10 if init_scale == 0 else init_scale
-    kernel_init = init.variance_scaling(1/3 * init_scale, 'fan_in', 'uniform')
+    kernel_init = jax.nn.initializers.variance_scaling(1/3 * init_scale, 'fan_in', 'uniform')
     kernel_shape = (kernel_size, kernel_size) + (x.shape[-1], out_planes)
     bias_init = lambda key, shape, dtype: \
         kernel_init(key, kernel_shape)[0, 0, 0, :]
