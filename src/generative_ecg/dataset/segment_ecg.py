@@ -1,88 +1,77 @@
 import neurokit2
-# from pytorch_forecasting.utils import autocorrelation
-import torch
+import jax
+import jax.numpy
 
-def _segment_signal(signal, window_lims, rpeaks):
-    """
-    Helper function to segment the ECG signal into individual beats.
-    Args:
-        signal (torch.tensor): ECG signal.
-        window_lims (tuple): Tuple containing the left and right window limits.
-        rpeaks (dict): Dictionary containing peak information.
-    Returns:
-        beats: torch tensor of beats.
-        beat_windows: torch tensor of beat windows.
-    """
-    l, r = window_lims
-    beat_windows = [(rpeak + l, rpeak + r) for rpeak in rpeaks]
-    beats = [signal[:, l:r] for (l, r) in beat_windows]
+def get_peaks(x_signal, sampling_rate=500):
+    _, x_peaks = neurokit2.ecg_process(x_signal[0], sampling_rate=sampling_rate)
+
+    return x_peaks
+
+def process(x_signal, x_peaks, y_signal, tmax=400):
+    # TODO: ENSURE WINDOW LIMS ACTUALLY MEANS TMAX
+    l, r = 0 - tmax // 2, tmax - tmax // 2
+    rpeaks = x_peaks['ECG_R_Peaks']
     
-    return torch.tensor(beats), torch.tensor(beat_windows)
+    x_beat_windows = jax.numpy.array([(rpeak + l, rpeak + r) for rpeak in rpeaks])
+    x_beats = jax.numpy.array([x_signal[:, l:r] for (l, r) in beat_windows])
 
-def _identify_duplicate_peaks(beat_windows, rpeaks, peaks):
-    """
-    Filters out duplicate peaks by checking if there is more than one of each peak type
-    in a given beat window.
-    Args:
-        beat_windows (list): List of beat windows.
-        rpeaks (dict): Dictionary containing peak information.
-        peak_types (list): List of peak types.
-    Returns:
-        dup_peaks: List of duplicate peaks.
-    """
+    peaks = 'PQRST'
     peak_types = [f"ECG_{peak}_Peaks" for peak in peaks]
 
     dup_peaks = [
-        any(sum(1 for peak in rpeaks[peak_type] if l < peak < r) > 1 
+        any(sum(1 for peak in x_peaks[peak_type] if l < peak < r) > 1 
             for peak_type in peak_types) 
-        for (l, r) in beat_windows
+        for (l, r) in x_beat_windows
     ]
 
-    return dup_peaks
+    x_beats = x_beats[~jax.numpy.array(dup_peaks)]
+    y_beats = y_signal[~jax.numpy.array(dup_peaks)]
 
-def _filter_beats(beats, beat_windows, rpeaks, range_cutoff, sd_cutoff, 
-                 autocorr_cutoff):
+    return x_beats, y_beats
+
+def filter_beats(x_beats, y_beats, beat_windows, rpeaks, drop_first=True, drop_last=True, range_min=0.5, sd_min=0.06, autocorr_min=0.75):
     """
     Filters out beats based on range, standard deviation, and autocorrelation.
     Args:
-        beats (list): torch tensor of beats.
-        beat_windows (list): torch tensor of beat windows.
+        beats (list): JAX array of beats.
+        beat_windows (list): JAX array of beat windows.
         rpeaks (dict): Dictionary containing peak information.
         range_cutoff (float, optional): Range cutoff value. 
         sd_cutoff (float, optional): Standard deviation cutoff value. 
         autocorr_cutoff (float, optional): Autocorrelation cutoff value. 
     Returns:
-        beats_filtered: torch tensor of filtered beats.
+        beats_filtered: JAX array of filtered beats.
     """
 
     # Filter out beats that are the first or last beat in the ECG signal
-    beats = beats[1:-1]
-    beat_windows = beat_windows[1:-1]
-    # beats = torch.from_numpy(np.array(beats))
-    
-    assert len(beats) == len(beat_windows)
+    if drop_first:
+        beats = beats[1:]
+        beat_windows = beat_windows[1:]
 
-    dup_peaks = _identify_duplicate_peaks(beat_windows, rpeaks, peaks='PQRST')
+    if drop_last:
+        beats = beats[:-1]
+        beat_windows = beat_windows[:-1]
 
-    beats_filtered = torch.tensor([])
+    # dup_peaks = identify_duplicate_peaks(beat_windows, rpeaks, peaks='PQRST')
+
+    filtered_beats = []
 
     for i, beat in enumerate(beats):
-        # save difference as variable 
-        if torch.mean(torch.max(beat, dim=1)[0] - torch.min(beat, dim=1)[0]).item() > range_cutoff:
-            # save mean as variable
-            if torch.mean(torch.std(beat, dim=1)).item() > sd_cutoff:
-                if not dup_peaks[i]:
-                    beats_filtered  = torch.cat((beats_filtered, beat))
-                # autocorrelated beats
-                # autocorrs = autocorrelation(beat, dim=1)[:, :5]
-                # autocorr_beat = torch.nanmean(torch.nanmean(autocorrs, dim=1), dim=0).item()
-                # if autocorr_beat > autocorr_cutoff:
-                #     beats_filtered.append(beat)
+        # Check range condition
+        beat_range = jax.numpy.mean(jax.numpy.max(beat, axis=1) - jax.numpy.min(beat, axis=1)).item()
+        if beat_range > range_min:
+            # Check standard deviation condition
+            beat_std = jax.numpy.mean(jax.numpy.std(beat, axis=1)).item()
+            if beat_std > sd_min:
+                filtered_beats.append(beat)
 
-    return beats_filtered
+    if filtered_beats:
+        return jax.numpy.stack(filtered_beats)
+
+    return jax.numpy.array([])
 
 
-def segment_and_filter_ecg(signal, sampling_rate, window_lims=(-100, 200)):
+def segment_and_filter_ecg(x_signal, sampling_rate, window_lims=(-100, 200)):
     """
     Segments and filters out beats based on certain criteria.
     Args:
@@ -90,16 +79,15 @@ def segment_and_filter_ecg(signal, sampling_rate, window_lims=(-100, 200)):
         sampling_rate (int): Sampling rate of the ECG signal.
         window_lims (tuple, optional): Tuple containing the left and right window limits.
     Returns:
-        beats_filtered: torch tensor of filtered beats.
+        beats_filtered: JAX array of filtered beats.
     """
-    # Identify beats
-    _, rpeaks = neurokit2.ecg_process(signal[0], sampling_rate=sampling_rate)
+    rpeaks = get_peaks(x_signal, sampling_rate=sampling_rate)
 
     # Identify beat segments based on R-peaks
-    beats, beat_windows = _segment_signal(signal, window_lims, rpeaks['ECG_R_Peaks'])
+    beats, beat_windows = segment_signal(signal, window_lims, rpeaks['ECG_R_Peaks'])
 
     # Filter beats
-    beats_filtered = _filter_beats(
+    beats_filtered = filter_beats(
         beats, beat_windows, rpeaks, range_cutoff=0.5, sd_cutoff=0.06, 
         autocorr_cutoff=0.75
     )
