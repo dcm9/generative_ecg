@@ -52,6 +52,8 @@ def train_cnn(X_beats, y_beats, model, loss_fn, lr_schedule, ckpt_dir:None,
         
         epoch_loss_hist.append(loss_hist)
 
+    # ANOTHER QUESTION: WHY DO WE NEED TO SAVE EPOCH LOSS HIST
+
     # Extract validation metrics
     loss, aux = loss_fn(state.params, model.apply, X_beats, y_beats)
     print(f"Loss: {loss:.4f}")
