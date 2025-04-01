@@ -9,7 +9,6 @@ import jax.random
 import orbax.checkpoint 
 import tqdm
 
-
 from ..models.loss_utils import (
     rmse_loss,
     binary_ce_loss
@@ -20,136 +19,47 @@ from ..models.nn_models import (
 
 )
 
-@partial(jax.jit, static_argnums=(1, 4))
-def update_step(state, apply_fn, X_batch, y_batch, problem="classification"):
-    loss_fn = binary_ce_loss if problem == "classification" else rmse_loss
-    (loss, aux), grads = jax.value_and_grad(loss_fn, has_aux=True)(
-        state.params, apply_fn, X_batch, y_batch
-    )
-    state = state.apply_gradients(grads=grads)
+def train_cnn(X_beats, y_beats, model, loss_fn, lr_schedule, ckpt_dir:None,  
+              batch_size=64):
 
-    return state, loss, aux
-
-
-def train_epoch(X, y, state, apply_fn, batch_size=128, key=0, 
-                problem="classification"):
-    if isinstance(key, int):
-        key = jax.random.PRNGKey(key)
-    n_train = len(X)
-    idx = jax.random.permutation(key, n_train)
-    X, y = X[idx], y[idx]
-    n_batches = n_train // batch_size
-    rem = n_train % batch_size
-    if rem:
-        n_batches += 1
-    losses, auxes = [], []
-    for batch in range(n_batches):
-        lb, ub = batch*batch_size, (batch+1)*batch_size
-        X_batch, y_batch = X[lb:ub], y[lb:ub]
-        state, loss, aux = update_step(state, apply_fn, X_batch, y_batch,
-                                  problem=problem)
-        losses.append(loss)
-        auxes.append(aux)
-    loss = jax.numpy.array(losses).mean()
-    aux = jax.numpy.array(auxes).mean()
-
-    return state, loss, aux
-
-
-def train_cnn(X, y, lr_init=1e-3, lr_peak=1e-2, lr_end=1e-3, n_epochs=10, 
-          batch_size=64, key=0, problem="classification"):
-    if isinstance(key, int):
-        key = jax.random.PRNGKey(key)
-    model = CNN(
-        output_dim=1
-    )
-    apply_fn = lambda p, x: model.apply(
-        p, x
-    )
-    params = model.init(
-        key, X[0]
-    )
-    n_train = len(X)
-    n_batches = n_train // batch_size
-    lr_schedule = optax.warmup_cosine_decay_schedule(
-        init_value=lr_init,
-        peak_value=lr_peak,
-        warmup_steps=(n_batches*n_epochs) // 50,
-        decay_steps=(n_batches*n_epochs) // 2,
-        end_value=lr_end
-    )
     optimizer = optax.adam(lr_schedule)
-    state = train_state.TrainState.create(
-        apply_fn=None, params=params, tx=optimizer
-    )
-    if problem == "classification":
-        prange = tqdm.tqdm(
-            range(n_epochs), desc=f"Epoch {0:>6} | "
-            f"Loss: {0.:>10.5f} | Accuracy: {0.:>10.2f}%"
-        )
-    else:
-        prange = tqdm.tqdm(
-            range(n_epochs), desc=f"Epoch {0:>6} | RMSE: {0.:>10.5f}"
-        )
-    for epoch in prange:
-        state, loss, aux = train_epoch(
-            X, y, state, apply_fn, batch_size, epoch, problem
-        )
-        if problem == "classification":
-            prange.set_description(
-                f"Epoch {epoch+1: >6} | Loss: {loss:>10.5f}" 
-                f" | Accuracy: {aux*100:>10.2f}%"
-            )
-        else:    
-            prange.set_description(
-                f"Epoch {epoch+1: >6} | RMSE: {loss:>10.5f}"
-            )
-   
+    model_key = jax.random.PRNGKey(0)
+    params = model.init(model_key, X_beats[0])
+    state = flax.training.train_state.TrainState.create(apply_fn=model.apply, params=params, tx=optimizer)
+    # QUESTION: DO WE SPLIT TRAIN/TEST, OR DOES THE USER IF WE'RE CALCULATING TR/TE values
+    batch_count = len(train_data[0]) // batch_size
+
+    # Run training loops
+    epoch_loss_hist = []
+    for epoch_n in range(epoch_count):
+        # Extract epoch-dependent info
+        epoch_key = jax.random.PRNGKey(epoch_n)
+        epoch_idxs = jax.random.permutation(epoch_key, len(X_beats[0]))
+        loss_hist = []
+        for batch_n in range(batch_count):
+            # Extract batch-dependent info
+            batch_idxs = epoch_idxs[i * batch_size : (i + 1) * batch_size]
+            X_batch, y_batch = X_beats[batch_idxs], y_beats[batch_idxs]
+
+            # Core JAX training step
+            batch_loss_fn = lambda params: loss_fn(params, state.apply_fn, X_batch, y_batch)
+            grad_fn = jax.value_and_grad(batch_loss_fn)
+            loss_value, grads = grad_fn(state.params)
+            state = state.apply_gradients(grads=grads)
+
+            # Store metadata
+            loss_hist.append(loss_value)
+        
+        epoch_loss_hist.append(loss_hist)
+
+    # Extract validation metrics
+    loss, aux = loss_fn(state.params, model.apply, X_beats, y_beats)
+    print(f"Loss: {loss:.4f}")
+
+    # Checkpointing 
+    if ckpt_dir:
+        ckptr = orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler())
+        save_args = orbax_utils.save_args_from_target(state)
+        ckptr.save(ckpt_dir, state, force=True, save_args=save_args)
+
     return state
-
-
-def train_discriminator(X_tr, y_tr, X_te, y_te, result_path, seed:int=0, 
-                         dataset:str="ptb-xl", beat_segment:bool=False, 
-                         processed:bool=False, target:str="age", 
-                         n_channels:int=12,n_epochs:int=100):
-    if target in ("age", "range", "max", "mean"):
-        problem = "regression"
-        loss_fn = rmse_loss
-    elif target in ("sex", "min-max-order"):
-        problem = "classification"
-        loss_fn = binary_ce_loss
-    else:
-        raise ValueError(f"Unknown target: {target}")
-    
-    # Shuffle
-    key = jax.random.PRNGKey(seed)
-    key, subkey = jax.random.split(key)
-    idx_tr = jax.random.permutation(key, len(X_tr))
-    X_tr, y_tr = X_tr[idx_tr], y_tr[idx_tr]
-    idx_te = jax.random.permutation(subkey, len(X_te))
-    X_te, y_te = X_te[idx_te], y_te[idx_te]
-    
-    # Train
-    state = train_cnn(X_tr, y_tr, n_epochs=n_epochs, problem=problem)
-    
-    # Evaluate
-    model = CNN(output_dim=1)
-    loss_te, aux_te = loss_fn(state.params, model.apply, X_te, y_te)
-    print(f"Test loss: {loss_te:.4f}")
-    if problem == "classification":
-        print(f"Test accuracy: {aux_te:.4f}")
-    
-    # Save checkpoint
-    dataset_name = dataset
-    if processed:
-        dataset_name += "_processed"
-    ckpt_dir = Path(result_path, dataset_name, f"{target}")
-    if beat_segment:
-        ckpt_dir = Path(ckpt_dir, f"cnn_bs_{n_channels}_ckpt")
-    else:
-        ckpt_dir = Path(ckpt_dir, f"cnn_{n_channels}_ckpt")
-    ckptr = orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler())
-    save_args = orbax_utils.save_args_from_target(state)
-    ckptr.save(ckpt_dir, state, force=True, save_args=save_args)
-
-    return ckpt_dir
