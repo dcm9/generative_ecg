@@ -1,10 +1,12 @@
 import tqdm
 import jax
 import jax.numpy
+import pandas
+import ast
+import wfdb
 
 from pathlib import Path
 
-from .process_data import load_data
 from ..models.math_utils import compute_linproj_residual
 from .segment_ecg import segment_and_filter_ecg
 
@@ -29,7 +31,7 @@ def load_signals(filepath, sampling_rate, target='age'):
     for i, f in enumerate(tqdm.tqdm(file_paths, desc="Loading data from records")):
         data.append(wfdb.rdsamp(Path(filepath, f)))
 
-    X = numpy.array([signal for signal, _ in data])
+    X = jax.numpy.array([signal for signal, _ in data]).transpose(0, 2, 1)
     y = df_annot[target].values
 
     return X,y
@@ -40,7 +42,7 @@ def project(x_beats,y_beats,tol=1e-6):
     processed_data = []
     processed_labels = []
 
-    for i, x in enumerate(tqdm.tqdm(x_beats, desc="Processing by linproj")):
+    for i, x in enumerate(x_beats):
         x_transpose = jax.numpy.transpose(x, (1, 0))
         sol, res = jax.vmap(compute_linproj_residual)(x_transpose)
         if jax.numpy.mean(res) < tol:

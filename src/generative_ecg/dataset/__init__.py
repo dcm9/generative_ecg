@@ -1,5 +1,6 @@
-from .process_data import load_processed_dataset, load_unprocessed_dataset
-from .segment_ecg import segment_and_filter_ecg
+from .process_data import load_signals, project
+from .segment_ecg import get_peaks, filter_beats, segment
+from .save_processed import save_beat_dataset, load_beat_dataset
 
-__all__ = ["load_processed_dataset", "load_unprocessed_dataset",
-           "segment_and_filter_ecg"]
+__all__ = ["load_signals", "project", "get_peaks", "filter_beats", "segment",
+           "save_beat_dataset", "load_beat_dataset"]

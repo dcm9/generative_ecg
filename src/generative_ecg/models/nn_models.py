@@ -11,6 +11,74 @@ from .math_utils import get_sigmas
 from functools import partial
 from typing import Any, Optional, Sequence
 
+import flax.linen as nn
+import jax
+import jax.numpy as jnp
+
+class ECGConv(linen.Module):
+    """
+    Convolutional Neural Network for ECG data processing.
+    
+    Attributes:
+        tmax: Maximum time steps in the ECG signal
+        n_channels: Number of ECG channels (leads)
+        n_layers_conv: Number of convolutional layers
+        n_layers_dense: Number of dense layers after convolution
+        n_outputs: Number of output dimensions
+        hidden_dim: Hidden dimension size (default: 64)
+        kernel_size: Size of convolutional kernels (default: 3)
+    """
+    tmax: int
+    n_channels: int
+    n_layers_conv: int
+    n_layers_dense: int
+    n_outputs: int
+    hidden_dim: int = 64
+    kernel_size: int = 3
+    
+    @nn.compact
+    def __call__(self, x, training=True):
+        # Input shape: (batch_size, n_channels, tmax)
+        # Reshape to (batch_size, tmax, n_channels) for conv layers
+        x = jnp.transpose(x, (0, 2, 1))
+        
+        # Initial feature dimension
+        features = self.hidden_dim
+        
+        # Convolutional layers
+        for i in range(self.n_layers_conv):
+            x = nn.Conv(
+                features=features,
+                kernel_size=(self.kernel_size,),
+                strides=(1,),
+                padding="SAME",
+                name=f"conv_{i}"
+            )(x)
+            x = nn.BatchNorm(use_running_average=not training, name=f"bn_conv_{i}")(x)
+            x = nn.relu(x)
+            x = nn.max_pool(x, window_shape=(2,), strides=(2,), padding="VALID")
+            
+            # Double features for each layer
+            features *= 2
+        
+        # Global average pooling
+        x = jnp.mean(x, axis=1)
+        
+        # Dense layers
+        for i in range(self.n_layers_dense):
+            x = nn.Dense(features=features, name=f"dense_{i}")(x)
+            x = nn.BatchNorm(use_running_average=not training, name=f"bn_dense_{i}")(x)
+            x = nn.relu(x)
+            
+            # Halve features for each layer
+            features //= 2
+            # Ensure we don't go below the output dimension
+            features = max(features, self.n_outputs)
+        
+        # Output layer
+        x = nn.Dense(features=self.n_outputs, name="output")(x)
+        
+        return x
 
 class MLP(linen.Module):
     features: Sequence[int]
