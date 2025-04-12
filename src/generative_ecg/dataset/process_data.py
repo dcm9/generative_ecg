@@ -8,7 +8,6 @@ import wfdb
 from pathlib import Path
 
 from ..models.math_utils import compute_linproj_residual
-from .segment_ecg import segment_and_filter_ecg
 
 def load_signals(filepath, sampling_rate, target='age'):
     if filepath is None:
