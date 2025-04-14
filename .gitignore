@@ -162,5 +162,7 @@ cython_debug/
 .envrc
 
 # data
-data/
+examples/ptb_xl/results/
+examples/ptb_xl/data/
+
 

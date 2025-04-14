@@ -1,6 +1,7 @@
 from functools import partial
 from pathlib import Path
 
+import flax
 from flax.training import train_state, orbax_utils
 import jax
 import optax
@@ -14,28 +15,29 @@ from ..models.loss_utils import (
     binary_ce_loss
 )
 
-from ..models.nn_models import (
-    CNN,
+# from ..models.nn_models import (
+#     CNN,
 
-)
+# )
 
 def train_cnn(X_tr, X_te, y_tr, y_te, model, loss_fn, lr_schedule, ckpt_dir:None,  
-              batch_size=64):
+              batch_size=64, n_epochs=1000):
 
     optimizer = optax.adam(lr_schedule)
     model_key = jax.random.PRNGKey(0)
     params = model.init(model_key, X_tr[0])
-    state = flax.training.train_state.TrainState.create(apply_fn=model.apply, params=params, tx=optimizer)
-    # QUESTION: DO WE SPLIT TRAIN/TEST, OR DOES THE USER IF WE'RE CALCULATING TR/TE values
-    batch_count = len(X_tr[0]) // batch_size
-
+    state = train_state.TrainState.create(apply_fn=model.apply, params=params, tx=optimizer)
+    # print(X_tr.shape, batch_size)
+    batch_count = X_tr.shape[0] // batch_size
     # Run training loops
-    for epoch_n in range(epoch_count):
+
+    for epoch_n in tqdm.tqdm(range(n_epochs), desc="Training", unit="epoch"):
         # Extract epoch-dependent info
         epoch_key = jax.random.PRNGKey(epoch_n)
-        epoch_idxs = jax.random.permutation(epoch_key, len(X_tr[0]))
+        epoch_idxs = jax.random.permutation(epoch_key, X_tr.shape[0])
         loss_hist = []
-        for batch_n in range(batch_count):
+
+        for i in range(batch_count):
             # Extract batch-dependent info
             batch_idxs = epoch_idxs[i * batch_size : (i + 1) * batch_size]
             X_batch, y_batch = X_tr[batch_idxs], y_tr[batch_idxs]
@@ -50,7 +52,7 @@ def train_cnn(X_tr, X_te, y_tr, y_te, model, loss_fn, lr_schedule, ckpt_dir:None
             loss_hist.append(loss_value)
     
     # Extract validation metrics
-    val_loss, aux = loss_fn(state.params, model.apply, X_te, y_te)
+    val_loss = loss_fn(state.params, model.apply, X_te, y_te)
     print(f"Validation Loss: {val_loss:.4f}")
 
     # Checkpointing 

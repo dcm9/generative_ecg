@@ -20,7 +20,7 @@ def rmse_loss(params, apply_fn, X_batch, y_batch):
     ).ravel()
     loss = jax.numpy.sqrt(jax.numpy.mean((y_preds - y_batch)**2))
     
-    return loss, loss
+    return loss
 
 def dr_reg(input, x_pred, pred_fn):
     x_disc = pred_fn(input)
