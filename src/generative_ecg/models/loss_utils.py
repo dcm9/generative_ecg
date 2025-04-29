@@ -49,4 +49,4 @@ def binary_loss(key, params, split_idx, input, encoder_apply, decoder_apply,
     dr_reg_val = dr_reg(input, x_pred, pred_fn)
     result = loss_rec + beta1 * loss_kl + beta2 * dr_reg_val
 
-    return result, (loss_rec, loss_kl, beta2 * dr_reg_val)
+    return result

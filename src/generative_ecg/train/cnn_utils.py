@@ -3,7 +3,7 @@ from flax.training import train_state
 import jax.random
 import optax
 
-from ..models.nn_models import CNN
+from ..models.nn_models import ECGConv
 
 def create_cnn_train_state(X, key=0):
     """Creates initial `TrainState`."""
@@ -11,7 +11,7 @@ def create_cnn_train_state(X, key=0):
     if isinstance(key, int):
         key = jax.random.PRNGKey(key)
     key, subkey = jax.random.split(key)
-    nn_model = CNN(output_dim=1)
+    nn_model = ECGConv(output_dim=1)
     params = nn_model.init(key, X[0])
 
     # Create trainstate

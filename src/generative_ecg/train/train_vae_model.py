@@ -16,21 +16,21 @@ from ..models.math_utils import OMAT
 from ..models.loss_utils import binary_loss
 
 
-def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, params, lr_schedule, ckpt_dir:None):
+def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
     model_key = jax.random.PRNGKey(0)
     key_enc, key_dec = jax.random.split(model_key)
     _, *x_dim = X_tr.shape
     x_dim = jax.numpy.array(x_dim)
     n = len(X_tr)
 
-    hidden_feats = [params['hidden_width']] * params['hidden_depth']
-    encoder_feats = [*hidden_feats, params['z_dim']]
-    decoder_feats = [*hidden_feats, jax.numpy.prod(params['z_dim'])]
+    hidden_feats = [hyp_params['hidden_width']] * hyp_params['hidden_depth']
+    encoder_feats = [*hidden_feats, hyp_params['z_dim']]
+    decoder_feats = [*hidden_feats, int(jax.numpy.prod(x_dim))]
 
-    if params['encoder_type'] == "mlp":
+    if hyp_params['encoder_type'] == "mlp":
         encoder = Encoder(encoder_feats)
-    elif params['encoder_type'] == "cnn":
-        encoder = CNNEncoder(params['z_dim'])
+    elif hyp_params['encoder_type'] == "cnn":
+        encoder = CNNEncoder(hyp_params['z_dim'])
 
     params_enc = encoder.init(key_enc, jax.numpy.ones(x_dim,))['params']
     params_enc, unflatten_fn_enc = ravel_pytree(params_enc)
@@ -39,8 +39,8 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, params, lr_schedule, ckpt_dir:Non
         {'params': unflatten_fn_enc(params)}, x
     )
 
-    decoder = Decoder(decoder_feats, use_bias=params['use_bias'])
-    params_dec = decoder.init(key_dec, jax.numpy.ones(params['z_dim'],))['params']
+    decoder = Decoder(decoder_feats, use_bias=hyp_params['use_bias'])
+    params_dec = decoder.init(key_dec, jax.numpy.ones(hyp_params['z_dim'],))['params']
     params_dec, unflatten_fn_dec = ravel_pytree(params_dec)
     print(f"Decoder params size: {params_dec.shape}")
     apply_fn_dec = lambda params, x: decoder.apply(
@@ -50,7 +50,7 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, params, lr_schedule, ckpt_dir:Non
     split_idx = len(params_enc)
 
     # Train state
-    n_steps = params['n_epochs'] * (n // params['batch_size'])
+    n_steps = hyp_params['n_epochs'] * (n // hyp_params['batch_size'])
     optimizer = optax.adam(lr_schedule)
     state = train_state.TrainState.create(
         apply_fn=None, params=params, tx=optimizer
@@ -58,33 +58,34 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, params, lr_schedule, ckpt_dir:Non
 
     # TODO: ALLOW FOR DIFFERENT BETA SCHEDULERS, CURRENTLY ONLY WARMUP_COSINE
     beta1_scheduler = optax.join_schedules(
-            [optax.linear_schedule(1.0, 1.0-params['beta1'], n_steps // 4),
-             optax.cosine_decay_schedule(1.0, n_steps // 2, alpha=1.0-params['beta1'])],
+            [optax.linear_schedule(1.0, 1.0-hyp_params['beta1'], n_steps // 4),
+             optax.cosine_decay_schedule(1.0, n_steps // 2, alpha=1.0-hyp_params['beta1'])],
             [n_steps // 4]
         )
     
-    pbar = tqdm.tqdm(range(params['n_epochs']), desc=f"Epoch 0 average loss: 0.0")
+    pbar = tqdm.tqdm(range(hyp_params['n_epochs']))
     # losses = []
 
     for epoch in pbar:
         # Extract epoch-dependent info
         epoch_key = jax.random.PRNGKey(epoch)
         epoch_idxs = jax.random.permutation(epoch_key, n)
-        batch_count = n // params['batch_size']
+        batch_count = n // hyp_params['batch_size']
 
         for i in range(batch_count):
             # Extract batch-dependent info
             batch_key = jax.random.PRNGKey(i)
-            batch_idxs = epoch_idxs[i * params['batch_size'] : (i + 1) * params['batch_size']]
+            batch_idxs = epoch_idxs[i * hyp_params['batch_size'] : (i + 1) * hyp_params['batch_size']]
             X_batch, y_batch = X_tr[batch_idxs], y_tr[batch_idxs]
 
             beta1 = 1 - beta1_scheduler(i)
             binary_loss_fn = lambda params, batch_key, input: binary_loss(
                 batch_key, params, split_idx, input, apply_fn_enc, apply_fn_dec,
-                pred_fn, beta1, params['beta2']
+                pred_fn, beta1, hyp_params['beta2']
             )
 
-            keys = jax.random.split(batch_key, len(batch_idxs))
+            keys = jax.random.split(batch_key, len(X_batch))
+
 
             # Core JAX training step
             batch_loss_fn = lambda params: tree_map(
@@ -95,7 +96,7 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, params, lr_schedule, ckpt_dir:Non
             loss_value, grads = grad_fn(state.params)
             state = state.apply_gradients(grads=grads)
 
-            tqdm.tqdm.set_description(pbar, f"Epoch {epoch} average loss: {loss_value:.4f}")
+        tqdm.tqdm.set_description(pbar, f"Epoch {epoch} average loss {loss_value:.4f}")
     
     def _step(carry, x):
         mu, sigmasq = apply_fn_enc(state.params[:split_idx], x)
