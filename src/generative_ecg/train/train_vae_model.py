@@ -9,43 +9,22 @@ import orbax.checkpoint
 import optax
 import tqdm
 
-from .cnn_utils import create_cnn_train_state
-from .dr_vae_utils import train_dr_vae
 from ..models.nn_models import Encoder, Decoder, CNNEncoder
-from ..models.math_utils import OMAT
+
 from ..models.loss_utils import binary_loss
+from ..train.dr_vae_utils import create_vae_base
 
-
-def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
+def train_vae(X, y, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
     model_key = jax.random.PRNGKey(0)
     key_enc, key_dec = jax.random.split(model_key)
-    _, *x_dim = X_tr.shape
+    _, *x_dim = X.shape
     x_dim = jax.numpy.array(x_dim)
-    n = len(X_tr)
+    n = len(X)
 
-    hidden_feats = [hyp_params['hidden_width']] * hyp_params['hidden_depth']
-    encoder_feats = [*hidden_feats, hyp_params['z_dim']]
-    decoder_feats = [*hidden_feats, int(jax.numpy.prod(x_dim))]
-
-    if hyp_params['encoder_type'] == "mlp":
-        encoder = Encoder(encoder_feats)
-    elif hyp_params['encoder_type'] == "cnn":
-        encoder = CNNEncoder(hyp_params['z_dim'])
-
-    params_enc = encoder.init(key_enc, jax.numpy.ones(x_dim,))['params']
-    params_enc, unflatten_fn_enc = ravel_pytree(params_enc)
-    print(f"Encoder params size: {params_enc.shape}")
-    apply_fn_enc = lambda params, x: encoder.apply(
-        {'params': unflatten_fn_enc(params)}, x
+    apply_fn_enc, apply_fn_dec, params_enc, params_dec = create_vae_base(
+        X, hyp_params
     )
 
-    decoder = Decoder(decoder_feats, use_bias=hyp_params['use_bias'])
-    params_dec = decoder.init(key_dec, jax.numpy.ones(hyp_params['z_dim'],))['params']
-    params_dec, unflatten_fn_dec = ravel_pytree(params_dec)
-    print(f"Decoder params size: {params_dec.shape}")
-    apply_fn_dec = lambda params, x: decoder.apply(
-        {'params': unflatten_fn_dec(params)}, x
-    )
     params = jax.numpy.array([*params_enc, *params_dec])
     split_idx = len(params_enc)
 
@@ -76,7 +55,7 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, hyp_params, lr_schedule, ckpt_dir
             # Extract batch-dependent info
             batch_key = jax.random.PRNGKey(i)
             batch_idxs = epoch_idxs[i * hyp_params['batch_size'] : (i + 1) * hyp_params['batch_size']]
-            X_batch, y_batch = X_tr[batch_idxs], y_tr[batch_idxs]
+            X_batch, y_batch = X[batch_idxs], y[batch_idxs]
 
             beta1 = 1 - beta1_scheduler(i)
             binary_loss_fn = lambda params, batch_key, input: binary_loss(
@@ -102,8 +81,8 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, hyp_params, lr_schedule, ckpt_dir
         mu, sigmasq = apply_fn_enc(state.params[:split_idx], x)
         return (mu, sigmasq), (mu, sigmasq)
 
-    carry_init = apply_fn_enc(state.params[:split_idx], X_tr[0])
-    _, (mus, sigmasqs) = jax.lax.scan(_step, carry_init, X_tr)
+    carry_init = apply_fn_enc(state.params[:split_idx], X[0])
+    _, (mus, sigmasqs) = jax.lax.scan(_step, carry_init, X)
     mu_mean, mu_std = jax.numpy.mean(mus, axis=0), jax.numpy.std(mus, axis=0)
     sigmasq_mean, sigmasq_std = jax.numpy.mean(sigmasqs, axis=0), \
         jax.numpy.std(sigmasqs, axis=0)
@@ -113,8 +92,6 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, hyp_params, lr_schedule, ckpt_dir
     params_enc, params_dec = state.params[:split_idx], state.params[split_idx:]
 
     result = {
-        'apply_fn_enc': apply_fn_enc,
-        'apply_fn_dec': apply_fn_dec,
         'mu_mean': mu_mean,
         'mu_std': mu_std,
         'sigmasq_mean': sigmasq_mean,
@@ -122,6 +99,11 @@ def train_vae(X_tr, X_te, y_tr, y_te, pred_fn, hyp_params, lr_schedule, ckpt_dir
         'params_enc': params_enc,
         'params_dec': params_dec,
     }
+
+    if ckpt_dir:
+        ckptr = orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler())
+        save_args = orbax_utils.save_args_from_target(result)
+        ckptr.save(ckpt_dir, result, force=True, save_args=save_args)
 
     return result
 

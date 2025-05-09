@@ -5,12 +5,12 @@ import matplotlib.pyplot
 
 from ..models.math_utils import OMAT
 
-def plot_ecg(channel_data, channels, n_channels=12, figsize=(16, 8), std=None,
-             title=None, ylim=None):
+def plot_ecg(channel_data, channels, n_channels, figsize, std,
+             title, ylim):
     fig, ax = matplotlib.pyplot.subplots(figsize=figsize)
     ax.set_xticks([])
     ax.set_yticks([])
-    gs = gridspec.GridSpec(n_channels, 1, height_ratios=[1,] * n_channels)
+    gs = matplotlib.gridspec.GridSpec(n_channels, 1, height_ratios=[1,] * n_channels)
 
     # Create each subplot
     axes = []
@@ -55,3 +55,6 @@ def find_closest_real_ecg(real_ecgs, ecg, processed=False):
     min_rmse = jax.numpy.min(rmses)
     
     return closest_ecg, min_rmse
+
+def plot_gaussian_noise(mu, sigma, key, shape):
+    return mu + sigma * jax.random.normal(key, shape=shape)
