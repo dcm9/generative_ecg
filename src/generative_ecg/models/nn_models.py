@@ -14,7 +14,7 @@ class ECGConv(flax.linen.Module):
     activation: flax.linen.Module = flax.linen.relu
 
     @flax.linen.compact
-    def __call__(self, x):
+    def __call__(self, x: jax.numpy.ndarray) -> jax.numpy.ndarray:
         x = jax.numpy.transpose(x, (1, 0)) # to (batch_size, time, channel)
         x = flax.linen.Conv(features=12, kernel_size=(10,))(x)
         x = self.activation(x)
@@ -29,48 +29,13 @@ class ECGConv(flax.linen.Module):
         
         return x
 
-# class MLP(flax.linen.Module):
-#     features: Sequence[int]
-#     activation: flax.linen.Module = flax.linen.softplus
-
-#     @flax.linen.compact
-#     def __call__(self, x):
-#         x = x.ravel()
-#         for feat in self.features[:-1]:
-#             x = self.activation(flax.linen.Dense(feat)(x))
-#         x = flax.linen.Dense(self.features[-1])(x)
-
-#         return x
-    
-    
-# class CNN(flax.linen.Module):
-#     output_dim: int
-#     activation: flax.linen.Module = flax.linen.relu
-    
-#     @flax.linen.compact
-#     def __call__(self, x):
-#         x = jax.numpy.transpose(x, (1, 0)) # to (batch_size, time, channel)
-#         x = flax.linen.Conv(features=12, kernel_size=(10,))(x)
-#         x = self.activation(x)
-#         x = flax.linen.avg_pool(x, window_shape=(2,), strides=(2,))
-#         x = flax.linen.Conv(features=12, kernel_size=(10,))(x)
-#         x = self.activation(x)
-#         x = flax.linen.avg_pool(x, window_shape=(2,), strides=(2,))
-#         x = x.ravel()
-#         x = flax.linen.Dense(features=128)(x)
-#         x = self.activation(x)
-#         x = flax.linen.Dense(features=self.output_dim)(x).ravel()
-        
-#         return x
-
-
 # Encoder that returns Gaussian moments
 class Encoder(flax.linen.Module):
     features: Sequence[int]
     activation: flax.linen.Module = flax.linen.relu
 
     @flax.linen.compact
-    def __call__(self, x):
+    def __call__(self, x: jax.numpy.ndarray) -> jax.numpy.ndarray:
         x = x.ravel()
         for feat in self.features[:-1]:
             x = self.activation(flax.linen.Dense(feat)(x))
@@ -87,7 +52,7 @@ class CNNEncoder(flax.linen.Module):
     activation: flax.linen.Module = flax.linen.relu
 
     @flax.linen.compact
-    def __call__(self, x):
+    def __call__(self, x: jax.numpy.ndarray) -> jax.numpy.ndarray:
         x = jax.numpy.transpose(x, (1, 0)) # to (batch_size, time, channel)
         x = flax.linen.Conv(features=12, kernel_size=(10,))(x)
         x = self.activation(x)
@@ -111,7 +76,7 @@ class Decoder(flax.linen.Module):
     use_bias: bool = True
 
     @flax.linen.compact
-    def __call__(self, x):
+    def __call__(self, x: jax.numpy.ndarray) -> jax.numpy.ndarray:
         x = x.ravel()
         for feat in self.features[:-1]:
             x = self.activation(flax.linen.Dense(feat)(x))

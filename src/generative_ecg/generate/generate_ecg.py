@@ -4,14 +4,26 @@ import jax.numpy
 import jax.random
 import matplotlib.pyplot 
 import tqdm
+from typing import Any
 
-from .plot_utils import plot_ecg, find_closest_real_ecg, plot_gaussian_noise
+from .plot_utils import plot_ecg, plot_gaussian_noise
 from ..models.math_utils import OMAT
 
 CHANNELS = ['I', 'II', 'III', 'aVR', 'aVF', 'aVL', 'V1', 'V2', 'V3', 
             'V4', 'V5', 'V6']
 
-def generate_ecgs(X, result, gen_params, save_dir):
+def generate_ecgs(X: jax.numpy.ndarray, result: dict[str, Any], gen_params: dict[str, Any], save_dir: str) -> None:
+    """
+    Generate ECGs using the decoder of a VAE model.
+    Args:
+        X (jax.numpy.ndarray): The original ECG data.
+        result (dict): The result dictionary containing the model parameters and functions.
+        gen_params (dict): The generation parameters including the number of ECGs to generate.
+        save_dir (str): The directory to save the generated ECGs.
+    
+    Returns:
+        None
+    """
     key = jax.random.PRNGKey(gen_params["seed"])
 
     for i in tqdm.trange(gen_params["n_ecgs"]):

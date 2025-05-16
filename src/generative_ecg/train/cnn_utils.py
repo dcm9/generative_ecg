@@ -5,11 +5,15 @@ import optax
 
 from ..models.nn_models import ECGConv
 
-def create_cnn_train_state(X, key=0):
-    """Creates initial `TrainState`."""
-    # Initialize NN model
-    if isinstance(key, int):
-        key = jax.random.PRNGKey(key)
+def create_cnn_train_state(X: jax.numpy.ndarray, key: jax.random.PRNGKey) -> train_state.TrainState:
+    """
+    Create a train state for the CNN model.
+    Args:
+        X (jax.numpy.ndarray): Input data for the model.
+        key (jax.random.PRNGKey): Random key for initialization.
+    Returns:
+        train_state.TrainState: Initialized train state.
+    """
     key, subkey = jax.random.split(key)
     nn_model = ECGConv(output_dim=1)
     params = nn_model.init(key, X[0])

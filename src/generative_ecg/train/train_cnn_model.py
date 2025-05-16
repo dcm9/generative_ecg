@@ -10,26 +10,48 @@ import jax.random
 import orbax.checkpoint 
 import tqdm
 
+from typing import Callable, Optional, Any
+
 from ..models.loss_utils import (
     rmse_loss,
     binary_ce_loss
 )
 
-# from ..models.nn_models import (
-#     CNN,
+def train_cnn(
+    X_tr: jax.numpy.ndarray,
+    X_te: jax.numpy.ndarray,
+    y_tr: jax.numpy.ndarray,
+    y_te: jax.numpy.ndarray,
+    model: Any,
+    loss_fn: Callable[[Any, Callable, jax.numpy.ndarray, jax.numpy.ndarray], Any],
+    lr_schedule: Any,
+    ckpt_dir: Optional[str] = None,
+    batch_size: int = 64,
+    n_epochs: int = 1000
+) -> train_state.TrainState:
+    """
+    Train a neural network model (e.g., CNN) using JAX and Optax.
 
-# )
+    Args:
+        X_tr (jax.numpy.ndarray): Training input data.
+        X_te (jax.numpy.ndarray): Validation input data.
+        y_tr (jax.numpy.ndarray): Training labels/targets.
+        y_te (jax.numpy.ndarray): Validation labels/targets.
+        model (Any): Flax model to be trained.
+        loss_fn (Callable): Loss function to use for training.
+        lr_schedule (Any): Learning rate schedule or optimizer.
+        ckpt_dir (Optional[str]): Directory to save checkpoints. If None, no checkpointing.
+        batch_size (int, optional): Batch size for training. Default is 64.
+        n_epochs (int, optional): Number of training epochs. Default is 1000.
 
-def train_cnn(X_tr, X_te, y_tr, y_te, model, loss_fn, lr_schedule, ckpt_dir:None,  
-              batch_size=64, n_epochs=1000):
-
+    Returns:
+        train_state.TrainState: The final training state containing model parameters and optimizer state.
+    """
     optimizer = optax.adam(lr_schedule)
     model_key = jax.random.PRNGKey(0)
     params = model.init(model_key, X_tr[0])
     state = train_state.TrainState.create(apply_fn=model.apply, params=params, tx=optimizer)
-    # print(X_tr.shape, batch_size)
     batch_count = X_tr.shape[0] // batch_size
-    # Run training loops
 
     for epoch_n in tqdm.tqdm(range(n_epochs), desc="Training", unit="epoch"):
         # Extract epoch-dependent info

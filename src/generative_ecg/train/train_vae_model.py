@@ -9,12 +9,34 @@ import orbax.checkpoint
 import optax
 import tqdm
 
-from ..models.nn_models import Encoder, Decoder, CNNEncoder
+from typing import Any, Callable, Dict, Optional, Tuple
 
+from ..models.nn_models import Encoder, Decoder, CNNEncoder
 from ..models.loss_utils import binary_loss
 from ..train.dr_vae_utils import create_vae_base
 
-def train_vae(X, y, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
+def train_vae(
+    X: jax.numpy.ndarray,
+    y: jax.numpy.ndarray,
+    pred_fn: Callable,
+    hyp_params: Dict[str, Any],
+    lr_schedule: Any,
+    ckpt_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Train a Variational Autoencoder (VAE) using JAX and Optax.
+
+    Args:
+        X (jax.numpy.ndarray): Input data array.
+        y (jax.numpy.ndarray): Target labels or auxiliary data.
+        pred_fn (Callable): Prediction or discriminator function for regularization.
+        hyp_params (dict): Dictionary of hyperparameters for the model and training.
+        lr_schedule (Any): Learning rate schedule or optimizer.
+        ckpt_dir (Optional[str]): Directory to save checkpoints. If None, no checkpointing.
+
+    Returns:
+        dict: Dictionary containing latent statistics and trained encoder/decoder parameters.
+    """
     model_key = jax.random.PRNGKey(0)
     key_enc, key_dec = jax.random.split(model_key)
     _, *x_dim = X.shape
@@ -65,7 +87,6 @@ def train_vae(X, y, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
 
             keys = jax.random.split(batch_key, len(X_batch))
 
-
             # Core JAX training step
             batch_loss_fn = lambda params: tree_map(
                 lambda x: jax.numpy.mean(x),
@@ -77,7 +98,17 @@ def train_vae(X, y, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
 
         tqdm.tqdm.set_description(pbar, f"Epoch {epoch} average loss {loss_value:.4f}")
     
-    def _step(carry, x):
+    def _step(carry: Any, x: jax.numpy.ndarray) -> Tuple[Any, Tuple[jax.numpy.ndarray, jax.numpy.ndarray]]:
+        """
+        Helper function for scanning over the dataset to collect latent statistics.
+
+        Args:
+            carry (Any): Carry-over state (not used here).
+            x (jax.numpy.ndarray): Input data sample.
+
+        Returns:
+            Tuple containing updated carry and a tuple of (mu, sigmasq).
+        """
         mu, sigmasq = apply_fn_enc(state.params[:split_idx], x)
         return (mu, sigmasq), (mu, sigmasq)
 
@@ -86,9 +117,7 @@ def train_vae(X, y, pred_fn, hyp_params, lr_schedule, ckpt_dir:None):
     mu_mean, mu_std = jax.numpy.mean(mus, axis=0), jax.numpy.std(mus, axis=0)
     sigmasq_mean, sigmasq_std = jax.numpy.mean(sigmasqs, axis=0), \
         jax.numpy.std(sigmasqs, axis=0)
-    
-    # losses= jax.numpy.array(losses)
-    
+        
     params_enc, params_dec = state.params[:split_idx], state.params[split_idx:]
 
     result = {

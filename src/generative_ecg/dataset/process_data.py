@@ -9,7 +9,18 @@ from pathlib import Path
 
 from ..models.math_utils import compute_linproj_residual
 
-def load_signals(filepath, sampling_rate, target='age'):
+def load_signals(filepath: str, sampling_rate: int, target: str='age') -> tuple[jax.numpy.ndarray, jax.numpy.ndarray]:
+    """
+    Load the ECG signals from the PTB-XL dataset.
+    Args:
+        filepath (str): Path to the PTB-XL dataset.
+        sampling_rate (int): Sampling rate of the ECG signals.
+        target (str): Target variable for the dataset. Default is 'age'.
+
+    Returns:
+        X (ndarray): ECG signals.
+        y (ndarray): Target variable.
+    """
     if filepath is None:
         raise ValueError("ECG filepath must be provided.")
 
@@ -21,10 +32,10 @@ def load_signals(filepath, sampling_rate, target='age'):
     df_annot.scp_codes = df_annot.scp_codes.apply(ast.literal_eval)
     # DEFAULT 500
     if sampling_rate == 500:
-        file_paths = list(df_annot.filename_hr)
+        file_paths: list = list(df_annot.filename_hr)
 
     elif sampling_rate == 100:
-        file_paths = list(df_annot.filename_lr)
+        file_paths: list = list(df_annot.filename_lr)
 
     data = []
     for i, f in enumerate(tqdm.tqdm(file_paths, desc="Loading data from records")):
@@ -35,7 +46,19 @@ def load_signals(filepath, sampling_rate, target='age'):
 
     return X,y
 
-def project(x_beats,y_beats,tol=1e-6):
+def project(x_beats: list, y_beats:list, tol: float=1e-6) -> tuple[jax.numpy.ndarray, jax.numpy.ndarray]:
+    """
+    Load the ECG signals and target variables from the PTB-XL dataset.
+
+    Args:
+        filepath (str): Path to the PTB-XL dataset directory.
+        sampling_rate (int): Sampling rate of the ECG signals (e.g., 500 or 100).
+        target (str): Name of the target variable column in the annotation file. Default is 'age'.
+
+    Returns:
+        X (jax.numpy.ndarray): Array of ECG signals with shape (num_samples, num_channels, num_timesteps).
+        y (jax.numpy.ndarray): Array of target variable values.
+    """
     X_proj, y_proj = jax.numpy.array([]), jax.numpy.array([])
 
     processed_data = []

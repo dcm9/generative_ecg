@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Sequence
+from typing import Sequence, Callable, Tuple, Any, Dict
 from tqdm import tqdm
 
 import jax
@@ -12,7 +12,34 @@ import orbax.checkpoint
 from ..models.nn_models import Encoder, Decoder, CNNEncoder
 from ..models.math_utils import OMAT
 
-def create_vae_base(X, model_params):
+def create_vae_base(
+    X: jax.numpy.ndarray,
+    model_params: Dict[str, Any]
+) -> Tuple[
+    Callable[[Any, jax.numpy.ndarray], Any],
+    Callable[[Any, jax.numpy.ndarray], Any],
+    Any,
+    Any
+]:
+    """
+    Create VAE encoder and decoder functions and their initial parameters.
+
+    Args:
+        X (jax.numpy.ndarray): Example input data, used to determine input shape.
+        model_params (dict): Dictionary of model hyperparameters, including:
+            - 'hidden_width': Width of hidden layers.
+            - 'hidden_depth': Number of hidden layers.
+            - 'z_dim': Latent dimension.
+            - 'encoder_type': 'mlp' or 'cnn'.
+            - 'use_bias': Whether to use bias in decoder layers.
+
+    Returns:
+        Tuple containing:
+            - apply_fn_enc: Function to apply the encoder.
+            - apply_fn_dec: Function to apply the decoder.
+            - params_enc: Flattened encoder parameters.
+            - params_dec: Flattened decoder parameters.
+    """
     model_key = jax.random.PRNGKey(0)
     key_enc, key_dec = jax.random.split(model_key)
     _, *x_dim = X.shape
@@ -43,9 +70,22 @@ def create_vae_base(X, model_params):
 
     return apply_fn_enc, apply_fn_dec, params_enc, params_dec
 
-def load_vae_from_ckpt(X, model_params, ckpt_dir):
-    """Load VAE model from checkpoint."""
-    # Load model
+def load_vae_from_ckpt(
+    X: jax.numpy.ndarray,
+    model_params: Dict[str, Any],
+    ckpt_dir: str
+) -> Dict[str, Any]:
+    """
+    Load a VAE model and its parameters from a checkpoint directory.
+
+    Args:
+        X (jax.numpy.ndarray): Example input data, used to determine input shape.
+        model_params (dict): Dictionary of model hyperparameters.
+        ckpt_dir (str): Path to the checkpoint directory.
+
+    Returns:
+        dict: Dictionary containing the loaded model parameters and encoder/decoder apply functions.
+    """
     fn_enc, fn_dec, _, _ = create_vae_base(X, model_params)
 
     ckptr = orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler())
@@ -53,15 +93,5 @@ def load_vae_from_ckpt(X, model_params, ckpt_dir):
 
     result['apply_fn_enc'] = fn_enc
     result['apply_fn_dec'] = fn_dec
-
-    # mu, sigmasq = fn_enc(result['params_enc'], X)
-    # z = mu + jax.numpy.sqrt(sigmasq) * jax.random.normal(jax.random.PRNGKey(0), mu.shape)
-    # x_rec = fn_dec(result['params_dec'], z).reshape(X.shape)
-
-    # if model_params['processed']:
-    #     x_rec = OMAT @ x_rec
-    #     X = OMAT @ X
-
-    # jax.numpy.sqrt(jax.numpy.mean((X - x_rec)**2))
 
     return result
